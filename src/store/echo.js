@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { clearWorkspace, commitWorkspaceChange, loadWorkspace, migrateLegacyLocalStorage, saveWorkspace } from "@/lib/offlineDB";
+import { normalizeTags } from "@/lib/noteTools";
 
 const now = () => new Date().toISOString();
 const uid = () => typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -42,7 +43,7 @@ export const useEcho = create((set, get) => ({
   },
 
   createNote: (folderId = null) => {
-    const note = { id: uid(), folder_id: folderId, title: "Untitled Note", content: "", is_favorite: false, is_archived: false, is_deleted: false, created_at: now(), updated_at: now() };
+    const note = { id: uid(), folder_id: folderId, title: "Untitled Note", content: "", tags: [], is_favorite: false, is_archived: false, is_deleted: false, created_at: now(), updated_at: now() };
     set((state) => ({ notes: [note, ...state.notes], activeNoteId: note.id, dirty: touch(state, note.id) }));
     record(get(), "note", note.id, "upsert", note);
     return note;
@@ -53,7 +54,7 @@ export const useEcho = create((set, get) => ({
     set((state) => ({
       notes: state.notes.map((note) => {
         if (note.id !== id) return note;
-        updated = { ...note, ...patch, updated_at: now() };
+        updated = { ...note, ...patch, ...(patch.tags ? { tags: normalizeTags(patch.tags) } : {}), updated_at: now() };
         return updated;
       }),
       dirty: touch(state, id),
@@ -153,7 +154,11 @@ export const useEcho = create((set, get) => ({
 export const searchNotes = (notes, query) => {
   const value = query.trim().toLowerCase();
   if (!value) return notes;
-  return notes.filter((note) => note.title.toLowerCase().includes(value) || note.content.toLowerCase().includes(value));
+  if (value.startsWith("#")) {
+    const tag = value.slice(1);
+    return notes.filter((note) => (note.tags ?? []).some((item) => item.includes(tag)));
+  }
+  return notes.filter((note) => note.title.toLowerCase().includes(value) || note.content.toLowerCase().includes(value) || (note.tags ?? []).some((tag) => tag.includes(value)));
 };
 export function preview(content, length = 90) {
   const text = content.replace(/[#*`>_-]/g, "").replace(/\s+/g, " ").trim();

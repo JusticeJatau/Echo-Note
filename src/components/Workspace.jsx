@@ -4,6 +4,14 @@ import { NoteEditor } from "@/components/NoteEditor";
 import { preview, relativeTime, searchNotes, useEcho } from "@/store/echo";
 import { cn } from "@/lib/utils";
 
+function Highlight({ text, query }) {
+  const value = query.trim().replace(/^#/, "");
+  if (!value) return text;
+  const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = String(text).split(new RegExp(`(${escaped})`, "gi"));
+  return parts.map((part, index) => part.toLowerCase() === value.toLowerCase() ? <mark key={index} className="rounded bg-warning/25 px-0.5 text-inherit">{part}</mark> : part);
+}
+
 export function Workspace({
   title,
   filter,
@@ -86,14 +94,15 @@ export function Workspace({
               )}
             >
               <div className="flex items-start gap-2">
-                <p className="min-w-0 flex-1 truncate text-sm font-medium">{note.title}</p>
+                <p className="min-w-0 flex-1 truncate text-sm font-medium"><Highlight text={note.title} query={search}/></p>
                 {note.is_favorite && (
                   <Star className="size-3.5 shrink-0 fill-current text-warning" />
                 )}
               </div>
               <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-                {preview(note.content) || "Empty note"}
+                <Highlight text={preview(note.content) || "Empty note"} query={search}/>
               </p>
+              {(note.tags ?? []).length > 0 && <div className="mt-2 flex flex-wrap gap-1">{note.tags.slice(0, 3).map((tag) => <span key={tag} className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">#{tag}</span>)}</div>}
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-[11px] text-muted-foreground">
                   {relativeTime(note.updated_at)}

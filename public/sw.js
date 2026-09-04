@@ -1,5 +1,5 @@
-const CACHE_VERSION = "echonotes-shell-v2";
-const RUNTIME_CACHE = "echonotes-runtime-v2";
+const CACHE_VERSION = "echonotes-shell-v3";
+const RUNTIME_CACHE = "echonotes-runtime-v3";
 const REQUIRED_SHELL = ["/app", "/manifest.webmanifest", "/echo8v-logo.png"];
 const OPTIONAL_SHELL = ["/", "/favicon.ico", "/offline.html"];
 

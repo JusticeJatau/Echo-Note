@@ -51,6 +51,7 @@ function buildDecorations(view) {
       addInline(ranges, line, /\*\*(.+?)\*\*/g, "cm-md-strong");
       addInline(ranges, line, /~~(.+?)~~/g, "cm-md-strike");
       addInline(ranges, line, /`([^`]+?)`/g, "cm-md-code", 1);
+      addInline(ranges, line, /\[\[(.+?)\]\]/g, "cm-md-note-link");
 
       const quote = line.text.match(/^>\s+/);
       if (quote) {
@@ -122,6 +123,7 @@ const editorTheme = EditorView.theme({
   ".cm-md-strong": { fontWeight: "750", color: "var(--color-foreground)" },
   ".cm-md-strike": { textDecoration: "line-through", color: "var(--color-muted-foreground)" },
   ".cm-md-code": { fontFamily: "JetBrains Mono, ui-monospace, monospace", background: "var(--color-surface-2)", color: "oklch(.76 .13 245)", borderRadius: "5px", padding: "2px 5px" },
+  ".cm-md-note-link": { color: "var(--color-primary)", textDecoration: "underline", textDecorationColor: "color-mix(in oklch, var(--color-primary) 45%, transparent)", textUnderlineOffset: "3px" },
   ".cm-md-quote": { color: "var(--color-muted-foreground)", fontStyle: "italic", borderLeft: "3px solid var(--color-primary)", paddingLeft: "14px" },
   ".cm-md-list-marker": { display: "inline-block", minWidth: "1.35rem", color: "var(--color-muted-foreground)" },
   "@media (max-width: 768px)": { ".cm-content": { padding: "8px 20px 120px" } },
