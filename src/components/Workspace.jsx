@@ -1,8 +1,16 @@
 import { Plus, Search, Star, RotateCcw, Trash2, X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { NoteEditor } from "@/components/NoteEditor";
 import { preview, relativeTime, searchNotes, useEcho } from "@/store/echo";
 import { cn } from "@/lib/utils";
+
+function Highlight({ text, query }) {
+  const value = query.trim().replace(/^#/, "");
+  if (!value) return text;
+  const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = String(text).split(new RegExp(`(${escaped})`, "gi"));
+  return parts.map((part, index) => part.toLowerCase() === value.toLowerCase() ? <mark key={index} className="rounded bg-warning/25 px-0.5 text-inherit">{part}</mark> : part);
+}
 
 export function Workspace({
   title,
@@ -12,6 +20,7 @@ export function Workspace({
   variant = "notes",
   folderId = null,
 }) {
+  const [listWidth, setListWidth] = useState(340);
   const {
     notes,
     activeNoteId,
@@ -34,9 +43,44 @@ export function Workspace({
     if (!active && visible.length && variant === "notes") setActiveNote(visible[0].id);
   }, [visible.length, active, variant]);
 
+  useEffect(() => {
+    const savedWidth = Number(localStorage.getItem("echonotes-note-list-width"));
+    if (savedWidth >= 260 && savedWidth <= 520) setListWidth(savedWidth);
+  }, []);
+
+  const resizeList = (event) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = listWidth;
+    let nextWidth = listWidth;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    const move = (moveEvent) => {
+      nextWidth = Math.min(520, Math.max(260, startWidth + moveEvent.clientX - startX));
+      setListWidth(nextWidth);
+    };
+    const stop = () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      localStorage.setItem("echonotes-note-list-width", String(nextWidth));
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+  };
+
+  const resizeWithKeyboard = (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const width = Math.min(520, Math.max(260, listWidth + (event.key === "ArrowRight" ? 16 : -16)));
+    setListWidth(width);
+    localStorage.setItem("echonotes-note-list-width", String(width));
+  };
+
   return (
     <div className="flex h-full min-w-0 flex-1">
-      <div className="flex w-full shrink-0 flex-col border-r border-border bg-surface/40 md:w-[340px]">
+      <div style={{ "--note-list-width": `${listWidth}px` }} className="flex w-full shrink-0 flex-col bg-surface/40 md:w-[var(--note-list-width)]">
         <header className="flex h-[60px] items-center gap-2 border-b border-border px-4">
           <h1 className="flex-1 text-[15px] font-semibold">{title}</h1>
           {variant === "notes" && (
@@ -86,14 +130,15 @@ export function Workspace({
               )}
             >
               <div className="flex items-start gap-2">
-                <p className="min-w-0 flex-1 truncate text-sm font-medium">{note.title}</p>
+                <p className="min-w-0 flex-1 truncate text-sm font-medium"><Highlight text={note.title} query={search}/></p>
                 {note.is_favorite && (
                   <Star className="size-3.5 shrink-0 fill-current text-warning" />
                 )}
               </div>
               <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-                {preview(note.content) || "Empty note"}
+                <Highlight text={preview(note.content) || "Empty note"} query={search}/>
               </p>
+              {(note.tags ?? []).length > 0 && <div className="mt-2 flex flex-wrap gap-1">{note.tags.slice(0, 3).map((tag) => <span key={tag} className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">#{tag}</span>)}</div>}
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-[11px] text-muted-foreground">
                   {relativeTime(note.updated_at)}
@@ -156,6 +201,8 @@ export function Workspace({
           ))}
         </div>
       </div>
+
+      <div role="separator" aria-label="Resize note list" aria-orientation="vertical" tabIndex={0} onPointerDown={resizeList} onDoubleClick={() => { setListWidth(340); localStorage.setItem("echonotes-note-list-width", "340"); }} onKeyDown={resizeWithKeyboard} className="group relative hidden w-1 shrink-0 cursor-col-resize bg-border outline-none hover:bg-primary/60 focus:bg-primary md:block"><span className="absolute left-1/2 top-1/2 h-10 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-muted-foreground/30 group-hover:bg-primary"/></div>
 
       {active ? (
         <NoteEditor note={active} />

@@ -21,6 +21,7 @@ import { Route as AppFavoritesRouteImport } from './routes/app.favorites'
 import { Route as AppProfileRouteImport } from './routes/app.profile'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppTrashRouteImport } from './routes/app.trash'
+import { Route as ShareShareIdRouteImport } from './routes/share.$shareId'
 import { Route as AppFoldersFolderIdRouteImport } from './routes/app.folders.$folderId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -83,6 +84,11 @@ const AppTrashRoute = AppTrashRouteImport.update({
   path: '/trash',
   getParentRoute: () => AppRoute,
 } as any)
+const ShareShareIdRoute = ShareShareIdRouteImport.update({
+  id: '/share/$shareId',
+  path: '/share/$shareId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppFoldersFolderIdRoute = AppFoldersFolderIdRouteImport.update({
   id: '/folders/$folderId',
   path: '/folders/$folderId',
@@ -101,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/app/profile': typeof AppProfileRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/trash': typeof AppTrashRoute
+  '/share/$shareId': typeof ShareShareIdRoute
   '/app/': typeof AppIndexRoute
   '/app/folders/$folderId': typeof AppFoldersFolderIdRoute
 }
@@ -115,6 +122,7 @@ export interface FileRoutesByTo {
   '/app/profile': typeof AppProfileRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/trash': typeof AppTrashRoute
+  '/share/$shareId': typeof ShareShareIdRoute
   '/app': typeof AppIndexRoute
   '/app/folders/$folderId': typeof AppFoldersFolderIdRoute
 }
@@ -131,6 +139,7 @@ export interface FileRoutesById {
   '/app/profile': typeof AppProfileRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/trash': typeof AppTrashRoute
+  '/share/$shareId': typeof ShareShareIdRoute
   '/app/': typeof AppIndexRoute
   '/app/folders/$folderId': typeof AppFoldersFolderIdRoute
 }
@@ -148,6 +157,7 @@ export interface FileRouteTypes {
     | '/app/profile'
     | '/app/settings'
     | '/app/trash'
+    | '/share/$shareId'
     | '/app/'
     | '/app/folders/$folderId'
   fileRoutesByTo: FileRoutesByTo
@@ -162,6 +172,7 @@ export interface FileRouteTypes {
     | '/app/profile'
     | '/app/settings'
     | '/app/trash'
+    | '/share/$shareId'
     | '/app'
     | '/app/folders/$folderId'
   id:
@@ -177,6 +188,7 @@ export interface FileRouteTypes {
     | '/app/profile'
     | '/app/settings'
     | '/app/trash'
+    | '/share/$shareId'
     | '/app/'
     | '/app/folders/$folderId'
   fileRoutesById: FileRoutesById
@@ -189,6 +201,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
+  ShareShareIdRoute: typeof ShareShareIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -277,6 +290,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTrashRouteImport
       parentRoute: typeof AppRoute
     }
+    '/share/$shareId': {
+      id: '/share/$shareId'
+      path: '/share/$shareId'
+      fullPath: '/share/$shareId'
+      preLoaderRoute: typeof ShareShareIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app/folders/$folderId': {
       id: '/app/folders/$folderId'
       path: '/folders/$folderId'
@@ -315,6 +335,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   VerifyEmailRoute: VerifyEmailRoute,
+  ShareShareIdRoute: ShareShareIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

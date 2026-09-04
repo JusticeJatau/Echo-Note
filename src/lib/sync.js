@@ -158,6 +158,7 @@ function toLocalNote(row) {
     folder_id: row.folder_id ?? null,
     title: row.title ?? "Untitled Note",
     content: row.content ?? "",
+    tags: row.tags ?? [],
     is_favorite: !!row.is_favorite,
     is_archived: !!row.is_archived,
     is_deleted: !!row.is_deleted,

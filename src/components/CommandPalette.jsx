@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Bell, Download, FileText, HelpCircle, Plus, Share2, Star, Trash2, Settings, Search } from "lucide-react";
+import { Bell, Download, FileText, HelpCircle, Plus, Share2, Star, Trash2, Settings, Search, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { searchNotes, useEcho } from "@/store/echo";
 
@@ -51,6 +51,7 @@ export function CommandPalette() {
     { label: "Settings", icon: Settings, run: () => void navigate({ to: "/app/settings" }) },
     { label: "Share active note", icon: Share2, run: () => setPanel("share") },
     { label: "Export active note", icon: Download, run: () => setPanel("export") },
+    { label: "Import Markdown or text", icon: Upload, run: () => setPanel("import") },
     { label: "Notifications", icon: Bell, run: () => setPanel("notifications") },
     { label: "Help & feedback", icon: HelpCircle, run: () => setPanel("help") },
   ];

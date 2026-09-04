@@ -9,6 +9,7 @@ import {
   List,
   ListOrdered,
   ListTodo,
+  Minus,
   Quote,
   Star,
   Strikethrough,
@@ -25,6 +26,8 @@ import { useEcho, wordCount } from "@/store/echo";
 import { cn } from "@/lib/utils";
 import { LiveMarkdownEditor } from "@/components/LiveMarkdownEditor";
 import { usePreferences } from "@/store/preferences";
+import { normalizeTags, noteLinks } from "@/lib/noteTools";
+import { useNavigate } from "@tanstack/react-router";
 
 const tools = [
   { icon: Heading1, label: "H1", insert: "# " },
@@ -39,12 +42,16 @@ const tools = [
   { icon: List, label: "Bullet list", insert: "- " },
   { icon: ListOrdered, label: "Numbered list", insert: "1. " },
   { icon: ListTodo, label: "Task", insert: "- [ ] " },
+  { icon: Minus, label: "Divider", insert: "\n---\n" },
 ];
 
 export function NoteEditor({ note }) {
-  const { updateNote, toggleFavorite, trashNote, setPanel } = useEcho();
+  const navigate = useNavigate();
+  const { notes, updateNote, toggleFavorite, trashNote, setPanel, setActiveNote, setSearch } = useEcho();
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
+  const [tags, setTags] = useState(note.tags ?? []);
+  const [tagText, setTagText] = useState("");
   const [saved, setSaved] = useState(true);
   const editorRef = useRef(null);
   const autosaveDelay = usePreferences((state) => state.autosaveDelay);
@@ -52,19 +59,20 @@ export function NoteEditor({ note }) {
   useEffect(() => {
     setTitle(note.title);
     setContent(note.content);
+    setTags(note.tags ?? []);
     setSaved(true);
   }, [note.id]);
 
   // debounced auto-save
   useEffect(() => {
-    if (title === note.title && content === note.content) return;
+    if (title === note.title && content === note.content && JSON.stringify(tags) === JSON.stringify(note.tags ?? [])) return;
     setSaved(false);
     const t = setTimeout(() => {
-      updateNote(note.id, { title, content });
+      updateNote(note.id, { title, content, tags });
       setSaved(true);
     }, autosaveDelay);
     return () => clearTimeout(t);
-  }, [title, content, autosaveDelay]);
+  }, [title, content, tags, autosaveDelay]);
 
   const insert = (snippet) => {
     const view = editorRef.current;
@@ -76,6 +84,51 @@ export function NoteEditor({ note }) {
       scrollIntoView: true,
     });
     view.focus();
+  };
+
+  const wrapSelection = (before, after = before) => {
+    const view = editorRef.current;
+    if (!view) return;
+    const { from, to } = view.state.selection.main;
+    const selected = view.state.sliceDoc(from, to);
+    view.dispatch({
+      changes: { from, to, insert: `${before}${selected}${after}` },
+      selection: { anchor: from + before.length, head: from + before.length + selected.length },
+      scrollIntoView: true,
+    });
+    view.focus();
+  };
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (!(event.ctrlKey || event.metaKey) || !editorRef.current?.hasFocus) return;
+      const key = event.key.toLowerCase();
+      if (key === "b") { event.preventDefault(); wrapSelection("**"); }
+      if (key === "i") { event.preventDefault(); wrapSelection("*"); }
+      if (key === "s") { event.preventDefault(); updateNote(note.id, { title, content, tags }); setSaved(true); }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [note.id, title, content, tags]);
+
+  const addTag = () => {
+    const next = normalizeTags([...tags, ...tagText.split(",")]);
+    setTags(next);
+    setTagText("");
+  };
+
+  const outboundTitles = noteLinks(content);
+  const outbound = notes.filter((item) => item.id !== note.id && outboundTitles.some((title) => title.toLowerCase() === item.title.toLowerCase()));
+  const backlinks = notes.filter((item) => item.id !== note.id && noteLinks(item.content).some((title) => title.toLowerCase() === titleCase(note.title)));
+  const openConnection = (id) => {
+    setSearch("");
+    setActiveNote(id);
+    void navigate({ to: "/app" });
+  };
+  const openNotePanel = (name) => {
+    updateNote(note.id, { title, content, tags });
+    setSaved(true);
+    setPanel(name);
   };
 
   const stats = wordCount(content);
@@ -109,8 +162,8 @@ export function NoteEditor({ note }) {
         ))}
         <div className="ml-auto flex items-center gap-1">
           <button onClick={() => setPanel("history")} title="Note history" className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface hover:text-foreground"><History className="size-4" /></button>
-          <button onClick={() => setPanel("export")} title="Export" className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface hover:text-foreground"><Download className="size-4" /></button>
-          <button onClick={() => setPanel("share")} title="Share" className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface hover:text-foreground"><Share2 className="size-4" /></button>
+          <button onClick={() => openNotePanel("export")} title="Export" className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface hover:text-foreground"><Download className="size-4" /></button>
+          <button onClick={() => openNotePanel("share")} title="Share" className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface hover:text-foreground"><Share2 className="size-4" /></button>
           <button
             onClick={() => toggleFavorite(note.id)}
             title="Favorite"
@@ -139,9 +192,15 @@ export function NoteEditor({ note }) {
             placeholder="Untitled Note"
             className="w-full bg-transparent text-[32px] font-bold leading-tight tracking-tight outline-none placeholder:text-muted-foreground"
           />
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            {tags.map((tag) => <button key={tag} type="button" title="Remove tag" onClick={() => setTags(tags.filter((item) => item !== tag))} className="rounded-md bg-primary/10 px-2 py-1 text-xs text-primary hover:bg-destructive/10 hover:text-destructive">#{tag} ×</button>)}
+            <form onSubmit={(event) => { event.preventDefault(); addTag(); }} className="flex items-center"><input value={tagText} onChange={(event) => setTagText(event.target.value)} onBlur={addTag} placeholder="+ Add tag" className="h-7 w-24 bg-transparent px-1 text-xs outline-none placeholder:text-muted-foreground focus:w-36"/></form>
+          </div>
         </div>
         <div className="min-h-0 flex-1"><LiveMarkdownEditor value={content} onChange={setContent} editorRef={editorRef} /></div>
       </div>
+
+      {(outbound.length > 0 || backlinks.length > 0) && <div className="flex flex-wrap items-center gap-2 border-t border-border px-6 py-2 text-xs"><span className="text-muted-foreground">Connections:</span>{outbound.map((item) => <button key={`out-${item.id}`} onClick={() => openConnection(item.id)} className="rounded-md bg-primary/10 px-2 py-1 text-primary">→ {item.title}</button>)}{backlinks.map((item) => <button key={`back-${item.id}`} onClick={() => openConnection(item.id)} className="rounded-md bg-surface px-2 py-1 text-muted-foreground hover:text-foreground">← {item.title}</button>)}</div>}
 
       <div className="flex items-center gap-4 border-t border-border px-6 py-2.5 text-xs text-muted-foreground">
         <span>{stats.words} words</span>
@@ -155,4 +214,8 @@ export function NoteEditor({ note }) {
       </div>
     </section>
   );
+}
+
+function titleCase(value) {
+  return String(value ?? "").trim().toLowerCase();
 }
