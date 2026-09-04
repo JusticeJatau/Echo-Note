@@ -30,7 +30,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { syncNow } from "@/lib/sync";
 import { useNotifications } from "@/store/notifications";
 import { supabase } from "@/integrations/supabase/client";
-import { downloadText, noteAsMarkdown, parseImportedNote, safeFilename } from "@/lib/noteTools";
+import { downloadText, noteAsMarkdown, parseImportedNote, printNoteAsPdf, safeFilename } from "@/lib/noteTools";
 
 const panelInfo = {
   sync: { title: "Sync Status", icon: RefreshCw },
@@ -140,11 +140,12 @@ function ExportPanel() {
   const [format, setFormat] = useState("md");
   const exportNote = () => {
     if (!note) return;
+    if (format === "pdf") { printNoteAsPdf(note); return; }
     const markdown = noteAsMarkdown(note);
     downloadText(`${safeFilename(note.title)}.${format}`, format === "md" ? markdown : `${note.title}\n\n${note.content}`, format === "md" ? "text/markdown;charset=utf-8" : "text/plain;charset=utf-8");
   };
   const exportBackup = () => downloadText(`echonotes-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ version: 1, exported_at: new Date().toISOString(), notes: notes.filter((item) => !item.is_deleted) }, null, 2), "application/json");
-  return <div className="p-5"><p className="text-sm text-muted-foreground">Download the current note or back up your complete workspace.</p><div className="mt-4 space-y-2">{[["md", "Markdown (.md)"], ["txt", "Text (.txt)"]].map(([value, label]) => <button key={value} onClick={() => setFormat(value)} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-sm ${format === value ? "border-primary bg-primary/10" : "border-border bg-surface/40"}`}><span className={`size-4 rounded-full border ${format === value ? "border-[5px] border-primary" : "border-muted-foreground"}`}/>{label}</button>)}</div><button disabled={!note} onClick={exportNote} className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground disabled:opacity-50"><Download className="size-4"/>Export current note</button><button onClick={exportBackup} className="mt-2 h-10 w-full rounded-lg border border-border text-sm hover:bg-surface">Back up all notes (.json)</button></div>;
+  return <div className="p-5"><p className="text-sm text-muted-foreground">Download the current note or back up your complete workspace.</p><div className="mt-4 space-y-2">{[["pdf", "PDF (.pdf)"], ["md", "Markdown (.md)"], ["txt", "Text (.txt)"]].map(([value, label]) => <button key={value} onClick={() => setFormat(value)} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-sm ${format === value ? "border-primary bg-primary/10" : "border-border bg-surface/40"}`}><span className={`size-4 rounded-full border ${format === value ? "border-[5px] border-primary" : "border-muted-foreground"}`}/>{label}</button>)}</div><button disabled={!note} onClick={exportNote} className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground disabled:opacity-50"><Download className="size-4"/>{format === "pdf" ? "Open PDF export" : "Export current note"}</button><button onClick={exportBackup} className="mt-2 h-10 w-full rounded-lg border border-border text-sm hover:bg-surface">Back up all notes (.json)</button>{format === "pdf" && <p className="mt-2 text-center text-xs text-muted-foreground">Choose “Save as PDF” in the print window.</p>}</div>;
 }
 
 function ImportPanel() {

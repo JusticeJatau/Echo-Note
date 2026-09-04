@@ -21,6 +21,18 @@ function addInline(ranges, line, pattern, className, markerSize = 2) {
   }
 }
 
+function addMarkdownLinks(ranges, line) {
+  for (const match of line.text.matchAll(/\[([^\]]+)\]\(([^)]+)\)/g)) {
+    const start = line.from + match.index;
+    const labelStart = start + 1;
+    const labelEnd = labelStart + match[1].length;
+    const end = start + match[0].length;
+    ranges.push([start, labelStart, hidden]);
+    ranges.push([labelStart, labelEnd, Decoration.mark({ class: "cm-md-note-link" })]);
+    ranges.push([labelEnd, end, hidden]);
+  }
+}
+
 function buildDecorations(view) {
   const ranges = [];
   const activeHead = view.state.selection.main.head;
@@ -49,9 +61,11 @@ function buildDecorations(view) {
 
     if (!active) {
       addInline(ranges, line, /\*\*(.+?)\*\*/g, "cm-md-strong");
+      addInline(ranges, line, /(?<!\*)\*([^*\n]+)\*(?!\*)/g, "cm-md-em", 1);
       addInline(ranges, line, /~~(.+?)~~/g, "cm-md-strike");
       addInline(ranges, line, /`([^`]+?)`/g, "cm-md-code", 1);
       addInline(ranges, line, /\[\[(.+?)\]\]/g, "cm-md-note-link");
+      addMarkdownLinks(ranges, line);
 
       const quote = line.text.match(/^>\s+/);
       if (quote) {
@@ -121,6 +135,7 @@ const editorTheme = EditorView.theme({
   ".cm-md-h3": { fontSize: "1.3rem" },
   ".cm-md-h4, .cm-md-h5, .cm-md-h6": { fontSize: "1.08rem" },
   ".cm-md-strong": { fontWeight: "750", color: "var(--color-foreground)" },
+  ".cm-md-em": { fontStyle: "italic" },
   ".cm-md-strike": { textDecoration: "line-through", color: "var(--color-muted-foreground)" },
   ".cm-md-code": { fontFamily: "JetBrains Mono, ui-monospace, monospace", background: "var(--color-surface-2)", color: "oklch(.76 .13 245)", borderRadius: "5px", padding: "2px 5px" },
   ".cm-md-note-link": { color: "var(--color-primary)", textDecoration: "underline", textDecorationColor: "color-mix(in oklch, var(--color-primary) 45%, transparent)", textUnderlineOffset: "3px" },
@@ -131,12 +146,13 @@ const editorTheme = EditorView.theme({
 
 export function LiveMarkdownEditor({ value, onChange, editorRef }) {
   const editorFontSize = usePreferences((state) => state.editorFontSize);
+  const editorMode = usePreferences((state) => state.editorMode);
   const spellCheck = usePreferences((state) => state.spellCheck);
   const theme = usePreferences((state) => state.theme);
   const [selectionMenu, setSelectionMenu] = useState(null);
   const extensions = useMemo(() => [
     markdown(),
-    livePreview(),
+    ...(editorMode === "live-preview" ? [livePreview()] : []),
     editorTheme,
     EditorView.theme({ "&": { fontSize: `${editorFontSize}px` } }),
     EditorView.lineWrapping,
@@ -158,7 +174,7 @@ export function LiveMarkdownEditor({ value, onChange, editorRef }) {
         top: showBelow ? Math.max(start.bottom, end.bottom) + 10 : Math.min(start.top, end.top) - 50,
       });
     }),
-  ], [editorFontSize]);
+  ], [editorFontSize, editorMode]);
 
   useEffect(() => {
     if (editorRef.current) editorRef.current.contentDOM.spellcheck = spellCheck ? "true" : "false";

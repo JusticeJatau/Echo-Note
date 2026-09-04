@@ -20,6 +20,8 @@ import {
   Share2,
   Sun,
   Cloud,
+  Eye,
+  FileCode2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useEcho, wordCount } from "@/store/echo";
@@ -55,6 +57,8 @@ export function NoteEditor({ note }) {
   const [saved, setSaved] = useState(true);
   const editorRef = useRef(null);
   const autosaveDelay = usePreferences((state) => state.autosaveDelay);
+  const editorMode = usePreferences((state) => state.editorMode);
+  const setPreference = usePreferences((state) => state.setPreference);
 
   useEffect(() => {
     setTitle(note.title);
@@ -206,9 +210,10 @@ export function NoteEditor({ note }) {
         <span>{stats.words} words</span>
         <span>{stats.characters} characters</span>
         <div className="ml-auto flex items-center gap-4">
-          <span className="flex items-center gap-1.5">
-            Markdown <span className="size-1.5 rounded-full bg-success" />
-          </span>
+          <button type="button" onClick={() => setPreference("editorMode", editorMode === "live-preview" ? "source" : "live-preview")} title="Switch editor mode" className="flex items-center gap-1.5 rounded-md px-2 py-1 hover:bg-surface hover:text-foreground">
+            {editorMode === "live-preview" ? <Eye className="size-3.5"/> : <FileCode2 className="size-3.5"/>}
+            {editorMode === "live-preview" ? "Live Preview" : "Source Mode"}
+          </button>
           <span>{saved ? "Saved" : "Saving..."}</span>
         </div>
       </div>
