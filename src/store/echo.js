@@ -34,7 +34,12 @@ export const useEcho = create((set, get) => ({
 
   setActiveNote: (id) => set({ activeNoteId: id }),
   setSearch: (search) => set({ search }),
-  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+  toggleSidebar: () => set((state) => {
+    const sidebarOpen = !state.sidebarOpen;
+    if (typeof localStorage !== "undefined") localStorage.setItem("echonotes-sidebar-open", String(sidebarOpen));
+    return { sidebarOpen };
+  }),
+  setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
   setCommandOpen: (commandOpen) => set({ commandOpen }),
   setPanel: (panel) => set({ panel }),
   setSyncState: (syncState, at) => {
