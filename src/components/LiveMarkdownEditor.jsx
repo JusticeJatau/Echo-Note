@@ -36,10 +36,28 @@ function addMarkdownLinks(ranges, line) {
 function buildDecorations(view) {
   const ranges = [];
   const activeHead = view.state.selection.main.head;
+  let inCodeBlock = false;
 
   for (let lineNumber = 1; lineNumber <= view.state.doc.lines; lineNumber += 1) {
     const line = view.state.doc.line(lineNumber);
     const active = activeHead >= line.from && activeHead <= line.to;
+    const fence = line.text.match(/^\s*```/);
+
+    if (fence) {
+      const fenceClass = inCodeBlock ? "cm-md-code-fence-close" : "cm-md-code-fence-open";
+      ranges.push([line.from, line.from, Decoration.line({ class: `cm-md-code-block-line ${fenceClass}` })]);
+      if (!active && line.to > line.from) ranges.push([line.from, line.to, hidden]);
+      else if (line.to > line.from) ranges.push([line.from, line.to, syntax]);
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+
+    if (inCodeBlock) {
+      ranges.push([line.from, line.from, Decoration.line({ class: "cm-md-code-block-line" })]);
+      if (line.to > line.from) ranges.push([line.from, line.to, Decoration.mark({ class: "cm-md-code-block-text" })]);
+      continue;
+    }
+
     const heading = line.text.match(/^(#{1,6})\s+/);
 
     if (heading) {
@@ -86,7 +104,7 @@ function buildDecorations(view) {
   const builder = new RangeSetBuilder();
   let lastFrom = -1;
   for (const [from, to, decoration] of ranges) {
-    if (from < lastFrom || to <= from) continue;
+    if (from < lastFrom || to < from) continue;
     builder.add(from, to, decoration);
     lastFrom = from;
   }
@@ -138,13 +156,17 @@ const editorTheme = EditorView.theme({
   ".cm-md-em": { fontStyle: "italic" },
   ".cm-md-strike": { textDecoration: "line-through", color: "var(--color-muted-foreground)" },
   ".cm-md-code": { fontFamily: "JetBrains Mono, ui-monospace, monospace", background: "var(--color-surface-2)", color: "oklch(.76 .13 245)", borderRadius: "5px", padding: "2px 5px" },
+  ".cm-md-code-block-line": { background: "var(--color-surface-2)", paddingLeft: "16px", paddingRight: "16px" },
+  ".cm-md-code-fence-open": { minHeight: "10px", color: "var(--color-muted-foreground)", borderRadius: "8px 8px 0 0", marginTop: "8px" },
+  ".cm-md-code-fence-close": { minHeight: "10px", color: "var(--color-muted-foreground)", borderRadius: "0 0 8px 8px", marginBottom: "8px" },
+  ".cm-md-code-block-text": { fontFamily: "JetBrains Mono, ui-monospace, SFMono-Regular, Consolas, monospace", color: "oklch(.78 .12 245)" },
   ".cm-md-note-link": { color: "var(--color-primary)", textDecoration: "underline", textDecorationColor: "color-mix(in oklch, var(--color-primary) 45%, transparent)", textUnderlineOffset: "3px" },
   ".cm-md-quote": { color: "var(--color-muted-foreground)", fontStyle: "italic", borderLeft: "3px solid var(--color-primary)", paddingLeft: "14px" },
   ".cm-md-list-marker": { display: "inline-block", minWidth: "1.35rem", color: "var(--color-muted-foreground)" },
   "@media (max-width: 768px)": { ".cm-content": { padding: "8px 20px 120px" } },
 }, { dark: true });
 
-export function LiveMarkdownEditor({ value, onChange, editorRef }) {
+export function LiveMarkdownEditor({ value, onChange, editorRef, readOnly = false }) {
   const editorFontSize = usePreferences((state) => state.editorFontSize);
   const editorMode = usePreferences((state) => state.editorMode);
   const spellCheck = usePreferences((state) => state.spellCheck);
@@ -156,10 +178,11 @@ export function LiveMarkdownEditor({ value, onChange, editorRef }) {
     editorTheme,
     EditorView.theme({ "&": { fontSize: `${editorFontSize}px` } }),
     EditorView.lineWrapping,
+    EditorView.editable.of(!readOnly),
     scrollPastEnd(),
     EditorView.updateListener.of((update) => {
       const selection = update.state.selection.main;
-      if (selection.empty || !update.view.hasFocus) {
+      if (readOnly || selection.empty || !update.view.hasFocus) {
         setSelectionMenu(null);
         return;
       }
@@ -174,7 +197,7 @@ export function LiveMarkdownEditor({ value, onChange, editorRef }) {
         top: showBelow ? Math.max(start.bottom, end.bottom) + 10 : Math.min(start.top, end.top) - 50,
       });
     }),
-  ], [editorFontSize, editorMode]);
+  ], [editorFontSize, editorMode, readOnly]);
 
   useEffect(() => {
     if (editorRef.current) editorRef.current.contentDOM.spellcheck = spellCheck ? "true" : "false";

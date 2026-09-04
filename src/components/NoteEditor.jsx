@@ -48,6 +48,7 @@ const tools = [
 ];
 
 export function NoteEditor({ note }) {
+  const readOnly = !!note.is_system;
   const navigate = useNavigate();
   const { notes, updateNote, toggleFavorite, trashNote, setPanel, setActiveNote, setSearch } = useEcho();
   const [title, setTitle] = useState(note.title);
@@ -69,6 +70,7 @@ export function NoteEditor({ note }) {
 
   // debounced auto-save
   useEffect(() => {
+    if (readOnly) return;
     if (title === note.title && content === note.content && JSON.stringify(tags) === JSON.stringify(note.tags ?? [])) return;
     setSaved(false);
     const t = setTimeout(() => {
@@ -76,7 +78,7 @@ export function NoteEditor({ note }) {
       setSaved(true);
     }, autosaveDelay);
     return () => clearTimeout(t);
-  }, [title, content, tags, autosaveDelay]);
+  }, [title, content, tags, autosaveDelay, readOnly]);
 
   const insert = (snippet) => {
     const view = editorRef.current;
@@ -105,7 +107,7 @@ export function NoteEditor({ note }) {
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      if (!(event.ctrlKey || event.metaKey) || !editorRef.current?.hasFocus) return;
+      if (readOnly || !(event.ctrlKey || event.metaKey) || !editorRef.current?.hasFocus) return;
       const key = event.key.toLowerCase();
       if (key === "b") { event.preventDefault(); wrapSelection("**"); }
       if (key === "i") { event.preventDefault(); wrapSelection("*"); }
@@ -113,7 +115,7 @@ export function NoteEditor({ note }) {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [note.id, title, content, tags]);
+  }, [note.id, title, content, tags, readOnly]);
 
   const addTag = () => {
     const next = normalizeTags([...tags, ...tagText.split(",")]);
@@ -156,8 +158,9 @@ export function NoteEditor({ note }) {
             key={tool.label}
             title={tool.label}
             onClick={() => insert(tool.insert)}
+            disabled={readOnly}
             className={cn(
-              "flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface hover:text-foreground",
+              "flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35",
               (i === 3 || i === 6 || i === 9) && "ml-2",
             )}
           >
@@ -165,9 +168,9 @@ export function NoteEditor({ note }) {
           </button>
         ))}
         <div className="ml-auto flex items-center gap-1">
-          <button onClick={() => setPanel("history")} title="Note history" className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface hover:text-foreground"><History className="size-4" /></button>
+          {!readOnly && <button onClick={() => setPanel("history")} title="Note history" className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface hover:text-foreground"><History className="size-4" /></button>}
           <button onClick={() => openNotePanel("export")} title="Export" className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface hover:text-foreground"><Download className="size-4" /></button>
-          <button onClick={() => openNotePanel("share")} title="Share" className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface hover:text-foreground"><Share2 className="size-4" /></button>
+          {!readOnly && <><button onClick={() => openNotePanel("share")} title="Share" className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface hover:text-foreground"><Share2 className="size-4" /></button>
           <button
             onClick={() => toggleFavorite(note.id)}
             title="Favorite"
@@ -184,7 +187,7 @@ export function NoteEditor({ note }) {
             className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface hover:text-destructive"
           >
             <Trash2 className="size-4" />
-          </button>
+          </button></>}
         </div>
       </div>
 
@@ -193,15 +196,17 @@ export function NoteEditor({ note }) {
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            readOnly={readOnly}
             placeholder="Untitled Note"
             className="w-full bg-transparent text-[32px] font-bold leading-tight tracking-tight outline-none placeholder:text-muted-foreground"
           />
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            {tags.map((tag) => <button key={tag} type="button" title="Remove tag" onClick={() => setTags(tags.filter((item) => item !== tag))} className="rounded-md bg-primary/10 px-2 py-1 text-xs text-primary hover:bg-destructive/10 hover:text-destructive">#{tag} ×</button>)}
-            <form onSubmit={(event) => { event.preventDefault(); addTag(); }} className="flex items-center"><input value={tagText} onChange={(event) => setTagText(event.target.value)} onBlur={addTag} placeholder="+ Add tag" className="h-7 w-24 bg-transparent px-1 text-xs outline-none placeholder:text-muted-foreground focus:w-36"/></form>
+            {tags.map((tag) => readOnly ? <span key={tag} className="rounded-md bg-primary/10 px-2 py-1 text-xs text-primary">#{tag}</span> : <button key={tag} type="button" title="Remove tag" onClick={() => setTags(tags.filter((item) => item !== tag))} className="rounded-md bg-primary/10 px-2 py-1 text-xs text-primary hover:bg-destructive/10 hover:text-destructive">#{tag} ×</button>)}
+            {!readOnly && <form onSubmit={(event) => { event.preventDefault(); addTag(); }} className="flex items-center"><input value={tagText} onChange={(event) => setTagText(event.target.value)} onBlur={addTag} placeholder="+ Add tag" className="h-7 w-24 bg-transparent px-1 text-xs outline-none placeholder:text-muted-foreground focus:w-36"/></form>}
+            {readOnly && <span className="ml-auto text-[11px] text-muted-foreground">Built-in guide · Read only</span>}
           </div>
         </div>
-        <div className="min-h-0 flex-1"><LiveMarkdownEditor value={content} onChange={setContent} editorRef={editorRef} /></div>
+        <div className="min-h-0 flex-1"><LiveMarkdownEditor value={content} onChange={setContent} editorRef={editorRef} readOnly={readOnly} /></div>
       </div>
 
       {(outbound.length > 0 || backlinks.length > 0) && <div className="flex flex-wrap items-center gap-2 border-t border-border px-6 py-2 text-xs"><span className="text-muted-foreground">Connections:</span>{outbound.map((item) => <button key={`out-${item.id}`} onClick={() => openConnection(item.id)} className="rounded-md bg-primary/10 px-2 py-1 text-primary">→ {item.title}</button>)}{backlinks.map((item) => <button key={`back-${item.id}`} onClick={() => openConnection(item.id)} className="rounded-md bg-surface px-2 py-1 text-muted-foreground hover:text-foreground">← {item.title}</button>)}</div>}
@@ -214,7 +219,7 @@ export function NoteEditor({ note }) {
             {editorMode === "live-preview" ? <Eye className="size-3.5"/> : <FileCode2 className="size-3.5"/>}
             {editorMode === "live-preview" ? "Live Preview" : "Source Mode"}
           </button>
-          <span>{saved ? "Saved" : "Saving..."}</span>
+          <span>{readOnly ? "Built-in note" : saved ? "Saved" : "Saving..."}</span>
         </div>
       </div>
     </section>
