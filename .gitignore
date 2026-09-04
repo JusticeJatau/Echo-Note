@@ -1,0 +1,90 @@
+# Dependencies
+node_modules/
+bower_components/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.env
+*.pem
+*.key
+*.cert
+*.crt
+
+# Build output
+dist/
+build/
+out/
+.next/
+.nuxt/
+.output/
+.vercel/
+.netlify/
+
+# Cache
+.cache/
+.parcel-cache/
+.vite/
+.turbo/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Local databases
+*.sqlite
+*.sqlite3
+*.db
+
+# Uploaded and temporary files
+uploads/
+tmp/
+temp/
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor settings
+.vscode/
+.idea/
+*.code-workspace
+
+# Package manager cache
+.npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/install-state.gz
+
+# Miscellaneous
+*.local
+*.bak
+*.backup
+*.orig
+
+node_modules/
+dist/
+.env
+.env.*
+!.env.example

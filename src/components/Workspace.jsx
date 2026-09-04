@@ -1,0 +1,177 @@
+import { Plus, Search, Star, RotateCcw, Trash2, X } from "lucide-react";
+import { useEffect } from "react";
+import { NoteEditor } from "@/components/NoteEditor";
+import { preview, relativeTime, searchNotes, useEcho } from "@/store/echo";
+import { cn } from "@/lib/utils";
+
+export function Workspace({
+  title,
+  filter,
+  emptyTitle,
+  emptyHint,
+  variant = "notes",
+  folderId = null,
+}) {
+  const {
+    notes,
+    activeNoteId,
+    setActiveNote,
+    createNote,
+    search,
+    setSearch,
+    toggleFavorite,
+    trashNote,
+    restoreNote,
+    destroyNote,
+  } = useEcho();
+
+  const visible = searchNotes(notes.filter(filter), search).sort((a, b) =>
+    b.updated_at.localeCompare(a.updated_at),
+  );
+  const active = visible.find((n) => n.id === activeNoteId) ?? null;
+
+  useEffect(() => {
+    if (!active && visible.length && variant === "notes") setActiveNote(visible[0].id);
+  }, [visible.length, active, variant]);
+
+  return (
+    <div className="flex h-full min-w-0 flex-1">
+      <div className="flex w-full shrink-0 flex-col border-r border-border bg-surface/40 md:w-[340px]">
+        <header className="flex h-[60px] items-center gap-2 border-b border-border px-4">
+          <h1 className="flex-1 text-[15px] font-semibold">{title}</h1>
+          {variant === "notes" && (
+            <button
+              onClick={() => createNote(folderId)}
+              className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity hover:opacity-90"
+              aria-label="New note"
+            >
+              <Plus className="size-4" />
+            </button>
+          )}
+        </header>
+
+        <div className="border-b border-border p-3">
+          <div className="flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 focus-within:border-ring">
+            <Search className="size-4 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search notes..."
+              className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} aria-label="Clear search">
+                <X className="size-3.5 text-muted-foreground hover:text-foreground" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-2">
+          {visible.length === 0 && (
+            <div className="px-4 py-10 text-center">
+              <p className="text-sm font-medium">{emptyTitle}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{emptyHint}</p>
+            </div>
+          )}
+          {visible.map((note) => (
+            <button
+              key={note.id}
+              onClick={() => setActiveNote(note.id)}
+              className={cn(
+                "mb-1.5 w-full rounded-xl border bg-card/50 px-3.5 py-3 text-left transition-colors",
+                note.id === activeNoteId
+                  ? "border-primary/50 bg-surface"
+                  : "border-transparent hover:border-border hover:bg-surface/70",
+              )}
+            >
+              <div className="flex items-start gap-2">
+                <p className="min-w-0 flex-1 truncate text-sm font-medium">{note.title}</p>
+                {note.is_favorite && (
+                  <Star className="size-3.5 shrink-0 fill-current text-warning" />
+                )}
+              </div>
+              <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                {preview(note.content) || "Empty note"}
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-[11px] text-muted-foreground">
+                  {relativeTime(note.updated_at)}
+                </span>
+                <div className="ml-auto flex items-center gap-1">
+                  {variant === "notes" ? (
+                    <>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(note.id);
+                        }}
+                        className="rounded p-1 text-muted-foreground hover:text-warning"
+                      >
+                        <Star className="size-3.5" />
+                      </span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          trashNote(note.id);
+                        }}
+                        className="rounded p-1 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          restoreNote(note.id);
+                        }}
+                        className="rounded p-1 text-muted-foreground hover:text-success"
+                      >
+                        <RotateCcw className="size-3.5" />
+                      </span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          destroyNote(note.id);
+                        }}
+                        className="rounded p-1 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {active ? (
+        <NoteEditor note={active} />
+      ) : (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-background">
+          <p className="text-sm text-muted-foreground">{emptyHint}</p>
+          {variant === "notes" && (
+            <button
+              onClick={() => createNote(folderId)}
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+            >
+              <Plus className="size-4" /> New note
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
