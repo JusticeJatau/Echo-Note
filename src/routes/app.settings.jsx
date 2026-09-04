@@ -9,7 +9,7 @@ import { usePreferences } from "@/store/preferences";
 export const Route = createFileRoute("/app/settings")({ component: SettingsPage });
 
 function Switch({ checked, onChange, label }) {
-  return <button type="button" role="switch" aria-checked={checked} aria-label={label} onClick={() => onChange(!checked)} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${checked ? "bg-primary" : "bg-surface-2"}`}><span className={`absolute top-1 size-4 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-6" : "translate-x-1"}`} /></button>;
+  return <button type="button" role="switch" aria-checked={checked} aria-label={label} onClick={() => onChange(!checked)} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${checked ? "bg-primary" : "bg-surface-2"}`}><span className={`absolute left-1 top-1 size-4 rounded-full bg-white shadow transition-transform duration-200 ${checked ? "translate-x-5" : "translate-x-0"}`} /></button>;
 }
 
 function Choice({ active, children, onClick }) {
