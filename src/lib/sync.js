@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useEcho } from "@/store/echo";
 import { usePreferences } from "@/store/preferences";
+import { useNotifications } from "@/store/notifications";
 
 /**
  * Offline-first sync: local storage is always the working copy.
@@ -56,12 +57,14 @@ export async function syncNow(userId) {
 
     store.markClean([...dirtyNotes, ...dirtyFolders].map((i) => i.id));
     store.setSyncState("synced", new Date().toISOString());
+    if (hadPendingChanges) useNotifications.getState().addAlert({ title: "Sync complete", message: "Your offline changes are safely stored in the cloud.", type: "success" });
     if (hadPendingChanges && usePreferences.getState().notifications && typeof Notification !== "undefined" && Notification.permission === "granted") {
       new Notification("EchoNotes", { body: "Your offline changes are now synced." });
     }
   } catch (error) {
     console.error("sync failed", error);
     store.setSyncState("error");
+    useNotifications.getState().addAlert({ title: "Sync couldn't finish", message: "Your changes are still safe on this device. EchoNotes will try again later.", type: "error" });
   }
 }
 

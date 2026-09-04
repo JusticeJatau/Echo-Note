@@ -17,6 +17,7 @@ import { useState } from "react";
 import { useEcho } from "@/store/echo";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { useNotifications } from "@/store/notifications";
 
 const links = [
   { to: "/app", label: "All Notes", icon: NotebookPen, exact: true },
@@ -30,6 +31,7 @@ export function AppSidebar() {
   const { user } = useAuth();
   const [newFolder, setNewFolder] = useState(false);
   const [name, setName] = useState("");
+  const unreadAlerts = useNotifications((state) => state.alerts.filter((alert) => !alert.read).length);
 
   const counts = {
     "/app": notes.filter((n) => !n.is_deleted).length,
@@ -157,8 +159,8 @@ export function AppSidebar() {
           [CircleHelp, "Help", () => setPanel("help")],
           [Crown, "Pro", () => setPanel("upgrade")],
         ].map(([Icon, label, action]) => (
-          <button key={label} onClick={action} title={label} className="flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] text-muted-foreground hover:bg-surface hover:text-foreground">
-            <Icon className="size-4" />{label}
+          <button key={label} onClick={action} title={label} className="relative flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] text-muted-foreground hover:bg-surface hover:text-foreground">
+            <Icon className="size-4" />{label}{label === "Alerts" && unreadAlerts > 0 ? <span className="absolute right-2 top-1 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] leading-4 text-white">{unreadAlerts > 9 ? "9+" : unreadAlerts}</span> : null}
           </button>
         ))}
       </div>

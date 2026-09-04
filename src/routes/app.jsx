@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { syncNow } from "@/lib/sync";
 import { claimGuestWorkspace, getGuestWorkspaceSummary } from "@/lib/offlineDB";
 import { useEcho } from "@/store/echo";
+import { useNotifications } from "@/store/notifications";
 
 export const Route = createFileRoute("/app")({
   head: () => ({
@@ -58,9 +59,10 @@ function AppLayout() {
     setClaimError("");
     try {
       const ownerId = `user:${user.id}`;
-      await claimGuestWorkspace(ownerId);
+      const claimed = await claimGuestWorkspace(ownerId);
       await hydrateLocal(ownerId);
       setGuestData(null);
+      useNotifications.getState().addAlert({ title: "Local notes added", message: `${claimed.notes} ${claimed.notes === 1 ? "note" : "notes"} added to your account.`, type: "success" });
       void syncNow(user.id);
     } catch (error) {
       console.error("Could not add guest notes to account", error);

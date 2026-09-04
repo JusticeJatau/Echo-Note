@@ -12,18 +12,22 @@ import {
   Link2,
   Lock,
   MessageSquare,
-  Radio,
   RefreshCw,
   Share2,
-  Sparkles,
   X,
   Folder,
   Plus,
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  Info,
+  Lightbulb,
 } from "lucide-react";
 import { useState } from "react";
 import { useEcho } from "@/store/echo";
 import { useAuth } from "@/hooks/useAuth";
 import { syncNow } from "@/lib/sync";
+import { useNotifications } from "@/store/notifications";
 
 const panelInfo = {
   sync: { title: "Sync Status", icon: RefreshCw },
@@ -44,7 +48,7 @@ function Modal({ title, icon: Icon, children, wide = false }) {
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`w-full ${wide ? "max-w-2xl" : "max-w-md"} overflow-hidden rounded-2xl border border-border bg-card shadow-2xl`}
+        className={`max-h-[85vh] w-full ${wide ? "max-w-2xl" : "max-w-md"} overflow-hidden rounded-2xl border border-border bg-card shadow-2xl`}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="flex items-center gap-3 border-b border-border px-5 py-4">
@@ -87,13 +91,56 @@ function ExportPanel() {
 }
 
 function NotificationsPanel() {
-  const notices = [[Check, "Note synced successfully", "Just now", "text-success"], [Radio, "Note updated on another device", "5m ago", "text-primary"], [Bell, "Reminder: Daily Journal", "1d ago", "text-warning"], [Sparkles, "EchoNotes product update", "2d ago", "text-primary"]];
-  return <div className="p-3"><div className="divide-y divide-border overflow-hidden rounded-xl border border-border">{notices.map(([Icon, text, time, color]) => <div key={text} className="flex items-center gap-3 bg-surface/30 px-4 py-3"><Icon className={`size-4 ${color}`} /><p className="flex-1 text-sm">{text}</p><span className="text-xs text-muted-foreground">{time}</span></div>)}</div><button className="mt-3 w-full py-2 text-sm text-primary">Mark all as read</button></div>;
+  const alerts = useNotifications((state) => state.alerts);
+  const markAllRead = useNotifications((state) => state.markAllRead);
+  const markRead = useNotifications((state) => state.markRead);
+  const removeAlert = useNotifications((state) => state.removeAlert);
+  const clearAlerts = useNotifications((state) => state.clearAlerts);
+  const unread = alerts.filter((alert) => !alert.read).length;
+  const iconFor = { success: CheckCircle2, error: AlertCircle, info: Info };
+  const colorFor = { success: "text-success", error: "text-destructive", info: "text-primary" };
+  const when = (iso) => {
+    const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    if (minutes < 1) return "Just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
+    return new Date(iso).toLocaleDateString();
+  };
+
+  return <div className="flex max-h-[68vh] flex-col">
+    <div className="flex items-center gap-3 border-b border-border px-4 py-3 text-xs"><span className="text-muted-foreground">{unread ? `${unread} unread` : "You're all caught up"}</span><div className="ml-auto flex gap-3">{unread > 0 && <button onClick={markAllRead} className="text-primary hover:underline">Mark all read</button>}{alerts.length > 0 && <button onClick={() => confirm("Clear all alerts?") && clearAlerts()} className="text-muted-foreground hover:text-destructive">Clear all</button>}</div></div>
+    <div className="overflow-y-auto p-3">{alerts.length === 0 ? <div className="py-12 text-center"><Bell className="mx-auto size-9 text-muted-foreground"/><p className="mt-3 text-sm font-medium">No alerts yet</p><p className="mt-1 text-xs text-muted-foreground">Sync and account activity will appear here.</p></div> : <div className="space-y-2">{alerts.map((alert) => { const Icon = iconFor[alert.type] ?? Info; return <div key={alert.id} onMouseEnter={() => !alert.read && markRead(alert.id)} className={`group flex gap-3 rounded-xl border p-3 ${alert.read ? "border-border bg-surface/30" : "border-primary/30 bg-primary/5"}`}><Icon className={`mt-0.5 size-4 shrink-0 ${colorFor[alert.type] ?? "text-primary"}`}/><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="text-sm font-medium">{alert.title}</p>{!alert.read && <span className="size-1.5 rounded-full bg-primary"/>}</div><p className="mt-1 text-xs leading-5 text-muted-foreground">{alert.message}</p><p className="mt-1 text-[10px] text-muted-foreground">{when(alert.createdAt)}</p></div><button onClick={() => removeAlert(alert.id)} aria-label="Dismiss alert" className="h-fit rounded-md p-1 text-muted-foreground opacity-0 hover:bg-surface hover:text-destructive group-hover:opacity-100"><X className="size-3.5"/></button></div>; })}</div>}</div>
+  </div>;
 }
 
 function HelpPanel() {
-  const items = [[BookOpen, "Documentation"], [FileText, "Keyboard shortcuts"], [MessageSquare, "Report a bug"], [Sparkles, "Request a feature"], [HelpCircle, "About Echo8V Notes"]];
-  return <div className="p-3">{items.map(([Icon, label]) => <button key={label} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm hover:bg-surface"><Icon className="size-4 text-muted-foreground"/><span className="flex-1 text-left">{label}</span><span className="text-muted-foreground">›</span></button>)}</div>;
+  const [view, setView] = useState("menu");
+  const [text, setText] = useState("");
+  const [copied, setCopied] = useState(false);
+  const items = [[BookOpen, "docs", "Getting started"], [FileText, "shortcuts", "Keyboard shortcuts"], [MessageSquare, "bug", "Report a problem"], [Lightbulb, "feature", "Request a feature"], [HelpCircle, "about", "About Echo8V Notes"]];
+  const copyReport = async (kind) => {
+    if (!text.trim()) return;
+    const report = `${kind}\n\n${text.trim()}\n\nApp: Echo8V Notes\nPlatform: ${navigator.userAgent}\nGenerated: ${new Date().toISOString()}`;
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(report);
+    else {
+      const field = document.createElement("textarea");
+      field.value = report;
+      document.body.appendChild(field);
+      field.select();
+      document.execCommand("copy");
+      field.remove();
+    }
+    setCopied(true);
+  };
+
+  if (view === "menu") return <div className="p-3">{items.map(([Icon, name, label]) => <button key={name} onClick={() => { setView(name); setText(""); setCopied(false); }} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm hover:bg-surface"><Icon className="size-4 text-muted-foreground"/><span className="flex-1 text-left">{label}</span><span className="text-muted-foreground">›</span></button>)}</div>;
+
+  return <div className="max-h-[68vh] overflow-y-auto p-5"><button onClick={() => setView("menu")} className="mb-5 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4"/>Back to Help</button>
+    {view === "docs" && <div><h3 className="font-semibold">Getting started</h3><div className="mt-4 space-y-4 text-sm leading-6 text-muted-foreground"><p><b className="text-foreground">Create:</b> Select New Note, add a title, then start writing. Changes save automatically to this device.</p><p><b className="text-foreground">Format:</b> Highlight text to open the formatting menu, or use the editor toolbar.</p><p><b className="text-foreground">Organize:</b> Create folders from the sidebar and move related notes together.</p><p><b className="text-foreground">Sync:</b> Sign in and choose Sync Now. Offline changes remain queued until your connection returns.</p><p><b className="text-foreground">Recover:</b> Deleted notes remain in Trash until you permanently remove them.</p></div></div>}
+    {view === "shortcuts" && <div><h3 className="font-semibold">Keyboard shortcuts</h3><div className="mt-4 divide-y divide-border rounded-xl border border-border px-4 text-sm">{[["Ctrl / ⌘ + K", "Open command search"], ["Ctrl / ⌘ + F", "Find in the editor"], ["Ctrl / ⌘ + Z", "Undo editing"], ["Escape", "Close a menu or dialog"], ["Enter", "Create a new paragraph"]].map(([keys, action]) => <p key={keys} className="flex items-center justify-between gap-4 py-3"><span className="text-muted-foreground">{action}</span><kbd className="rounded border border-border bg-surface px-2 py-1 text-xs">{keys}</kbd></p>)}</div></div>}
+    {(view === "bug" || view === "feature") && <div><h3 className="font-semibold">{view === "bug" ? "Report a problem" : "Request a feature"}</h3><p className="mt-1 text-sm text-muted-foreground">{view === "bug" ? "Describe what happened, what you expected, and how to reproduce it." : "Explain what you want to do and why it would help."}</p><textarea value={text} onChange={(event) => { setText(event.target.value); setCopied(false); }} rows={7} placeholder={view === "bug" ? "Example: I was editing a note when…" : "It would be useful if EchoNotes could…"} className="mt-4 w-full resize-none rounded-xl border border-input bg-surface p-3 text-sm outline-none focus:border-ring"/><button disabled={!text.trim()} onClick={() => void copyReport(view === "bug" ? "EchoNotes bug report" : "EchoNotes feature request")} className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground disabled:opacity-50"><Copy className="size-4"/>{copied ? "Copied — ready to share" : "Copy report"}</button><p className="mt-2 text-center text-xs text-muted-foreground">The report stays on your device until you choose where to send it.</p></div>}
+    {view === "about" && <div className="text-center"><img src="/echo8v-logo.png" alt="Echo8V" className="mx-auto size-20 object-contain"/><h3 className="mt-4 text-lg font-semibold">Echo8V Notes</h3><p className="mt-1 text-xs text-muted-foreground">Offline-first beta</p><p className="mx-auto mt-5 max-w-sm text-sm leading-6 text-muted-foreground">A focused personal notes workspace built by Echo8V. Your notes are written locally first and can sync securely when you sign in.</p><div className="mt-5 rounded-xl border border-border bg-surface/40 p-4 text-left text-xs text-muted-foreground"><p className="flex justify-between"><span>Local storage</span><span className="text-success">Enabled</span></p><p className="mt-3 flex justify-between"><span>Markdown editor</span><span className="text-success">Enabled</span></p><p className="mt-3 flex justify-between"><span>Cloud sync</span><span>Supabase</span></p></div></div>}
+  </div>;
 }
 
 function UpgradePanel() {
