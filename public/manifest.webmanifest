@@ -1,0 +1,27 @@
+{
+  "id": "/app",
+  "name": "Echo8V Notes",
+  "short_name": "EchoNotes",
+  "description": "Offline-first personal notes from Echo8V.",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#111018",
+  "theme_color": "#7137d8",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/echo8v-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/echo8v-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
