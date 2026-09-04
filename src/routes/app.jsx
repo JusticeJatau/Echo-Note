@@ -25,16 +25,26 @@ export const Route = createFileRoute("/app")({
 });
 
 function AppLayout() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const setSyncState = useEcho((s) => s.setSyncState);
+  const hydrateLocal = useEcho((s) => s.hydrateLocal);
+  const hydrated = useEcho((s) => s.hydrated);
 
   useEffect(() => {
-    if (user) {
-      void syncNow(user.id);
-    } else {
-      setSyncState("offline");
-    }
-  }, [user?.id]);
+    if (loading) return;
+    let cancelled = false;
+    const ownerId = user ? `user:${user.id}` : "guest";
+    void hydrateLocal(ownerId).then((ready) => {
+      if (!ready || cancelled) return;
+      if (user) void syncNow(user.id);
+      else setSyncState("offline");
+    });
+    return () => { cancelled = true; };
+  }, [loading, user?.id, hydrateLocal, setSyncState]);
+
+  if (loading || !hydrated) {
+    return <div className="flex h-screen items-center justify-center bg-background text-foreground"><div className="text-center"><img src="/echo8v-logo.png" alt="Echo8V" className="mx-auto size-16 animate-pulse object-contain"/><p className="mt-3 text-sm text-muted-foreground">Opening your local workspace…</p></div></div>;
+  }
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
