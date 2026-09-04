@@ -23,6 +23,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useEcho, wordCount } from "@/store/echo";
 import { cn } from "@/lib/utils";
+import { LiveMarkdownEditor } from "@/components/LiveMarkdownEditor";
 
 const tools = [
   { icon: Heading1, label: "H1", insert: "# " },
@@ -44,7 +45,7 @@ export function NoteEditor({ note }) {
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [saved, setSaved] = useState(true);
-  const areaRef = useRef(null);
+  const editorRef = useRef(null);
 
   useEffect(() => {
     setTitle(note.title);
@@ -64,15 +65,15 @@ export function NoteEditor({ note }) {
   }, [title, content]);
 
   const insert = (snippet) => {
-    const el = areaRef.current;
-    if (!el) return;
-    const start = el.selectionStart;
-    const next = content.slice(0, start) + snippet + content.slice(el.selectionEnd);
-    setContent(next);
-    requestAnimationFrame(() => {
-      el.focus();
-      el.selectionStart = el.selectionEnd = start + snippet.length;
+    const view = editorRef.current;
+    if (!view) return;
+    const { from, to } = view.state.selection.main;
+    view.dispatch({
+      changes: { from, to, insert: snippet },
+      selection: { anchor: from + snippet.length },
+      scrollIntoView: true,
     });
+    view.focus();
   };
 
   const stats = wordCount(content);
@@ -128,23 +129,16 @@ export function NoteEditor({ note }) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-3xl px-10 py-8">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="mx-auto w-full max-w-3xl shrink-0 px-10 pb-2 pt-8">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Untitled Note"
             className="w-full bg-transparent text-[32px] font-bold leading-tight tracking-tight outline-none placeholder:text-muted-foreground"
           />
-          <textarea
-            ref={areaRef}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Start writing your thoughts..."
-            spellCheck={false}
-            className="mt-4 h-[calc(100vh-320px)] w-full resize-none bg-transparent font-mono text-[15px] leading-7 text-foreground/90 outline-none placeholder:text-muted-foreground"
-          />
         </div>
+        <div className="min-h-0 flex-1"><LiveMarkdownEditor value={content} onChange={setContent} editorRef={editorRef} /></div>
       </div>
 
       <div className="flex items-center gap-4 border-t border-border px-6 py-2.5 text-xs text-muted-foreground">

@@ -153,3 +153,22 @@
 @utility echo-glow {
   box-shadow: 0 0 0 1px oklch(0.55 0.235 292 / 0.35), 0 8px 30px oklch(0.55 0.235 292 / 0.18);
 }
+
+/* CodeMirror ships with its own surface colors. Keep every editor layer tied
+ * to the EchoNotes theme so its default light theme can never bleed through. */
+.echonotes-editor,
+.echonotes-editor .cm-editor,
+.echonotes-editor .cm-scroller,
+.echonotes-editor .cm-content {
+  background-color: var(--color-background) !important;
+  color: var(--color-foreground);
+}
+
+.echonotes-editor .cm-editor.cm-focused {
+  outline: none;
+}
+
+.echonotes-editor .cm-placeholder {
+  color: var(--color-muted-foreground);
+  opacity: 0.75;
+}
