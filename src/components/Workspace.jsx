@@ -40,8 +40,8 @@ export function Workspace({
   const active = visible.find((n) => n.id === activeNoteId) ?? null;
 
   useEffect(() => {
-    if (!active && visible.length && variant === "notes") setActiveNote(visible[0].id);
-  }, [visible.length, active, variant]);
+    if (activeNoteId && !active && visible.length && variant === "notes") setActiveNote(visible[0].id);
+  }, [visible.length, active, activeNoteId, variant]);
 
   useEffect(() => {
     const savedWidth = Number(localStorage.getItem("echonotes-note-list-width"));

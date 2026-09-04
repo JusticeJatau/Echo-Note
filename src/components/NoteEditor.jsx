@@ -22,6 +22,8 @@ import {
   Cloud,
   Eye,
   FileCode2,
+  Plus,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useEcho, wordCount } from "@/store/echo";
@@ -50,7 +52,7 @@ const tools = [
 export function NoteEditor({ note }) {
   const readOnly = !!note.is_system;
   const navigate = useNavigate();
-  const { notes, updateNote, toggleFavorite, trashNote, setPanel, setActiveNote, setSearch } = useEcho();
+  const { notes, openedNoteIds, updateNote, toggleFavorite, trashNote, createNote, closeNoteTab, setPanel, setActiveNote, setSearch } = useEcho();
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [tags, setTags] = useState(note.tags ?? []);
@@ -138,14 +140,41 @@ export function NoteEditor({ note }) {
   };
 
   const stats = wordCount(content);
+  const openTabs = openedNoteIds.map((id) => notes.find((item) => item.id === id)).filter(Boolean);
+  const saveDraft = () => {
+    if (!readOnly && (title !== note.title || content !== note.content || JSON.stringify(tags) !== JSON.stringify(note.tags ?? []))) {
+      updateNote(note.id, { title, content, tags });
+    }
+  };
+  const activateTab = (id) => {
+    if (id === note.id) return;
+    saveDraft();
+    setSearch("");
+    void navigate({ to: "/app" }).then(() => setActiveNote(id));
+  };
+  const closeTab = (event, id) => {
+    event.stopPropagation();
+    if (id === note.id) saveDraft();
+    closeNoteTab(id);
+  };
 
   return (
     <section className="hidden min-w-0 flex-1 flex-col bg-background md:flex">
-      <div className="flex h-12 items-end border-b border-border bg-sidebar px-3">
-        <div className="flex h-10 min-w-0 max-w-[260px] items-center gap-2 rounded-t-lg border border-b-0 border-border bg-background px-3 text-xs">
-          <span className="size-2 rounded-full bg-primary" /><span className="truncate">{note.title || "Untitled Note"}</span><span className="ml-auto text-muted-foreground">×</span>
+      <div className="flex h-12 min-w-0 items-end border-b border-border bg-sidebar pl-3 pr-2">
+        <div className="flex min-w-0 flex-1 items-end gap-1 overflow-x-auto [scrollbar-width:thin]">
+          {openTabs.map((tab) => {
+            const active = tab.id === note.id;
+            const tabTitle = active ? title : tab.title;
+            return <button key={tab.id} type="button" onClick={() => activateTab(tab.id)} title={tabTitle || "Untitled Note"} className={cn("group flex h-10 min-w-[132px] max-w-[240px] shrink-0 items-center gap-2 rounded-t-lg border px-3 text-xs transition-colors", active ? "border-border border-b-background bg-background text-foreground" : "border-transparent bg-transparent text-muted-foreground hover:bg-surface hover:text-foreground")}>
+              <span className={cn("size-2 shrink-0 rounded-full", tab.is_welcome ? "bg-primary" : active ? "bg-success" : "bg-muted-foreground/40")} />
+              <span className="min-w-0 flex-1 truncate text-left">{tabTitle || "Untitled Note"}</span>
+              <span role="button" tabIndex={0} aria-label={`Close ${tabTitle || "Untitled Note"}`} onClick={(event) => closeTab(event, tab.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") closeTab(event, tab.id); }} className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-60 hover:bg-surface-2 hover:text-foreground group-hover:opacity-100">
+                <X className="size-3" />
+              </span>
+            </button>;
+          })}
         </div>
-        <button className="mb-1 ml-2 rounded p-2 text-muted-foreground hover:bg-surface">+</button>
+        <button type="button" onClick={() => createNote()} title="New note" className="mb-1 ml-1 flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-surface hover:text-foreground"><Plus className="size-4" /></button>
         <div className="mb-1 ml-auto flex items-center gap-1">
           <button title="Theme" className="rounded p-2 text-muted-foreground hover:bg-surface"><Sun className="size-4" /></button>
           <button onClick={() => setPanel("sync")} title="Cloud sync" className="rounded p-2 text-muted-foreground hover:bg-surface"><Cloud className="size-4" /></button>
