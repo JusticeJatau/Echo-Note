@@ -164,6 +164,26 @@
   color: var(--color-foreground);
 }
 
+.echonotes-editor {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.echonotes-editor .cm-editor {
+  height: 100%;
+  min-height: 0;
+}
+
+.echonotes-editor .cm-scroller {
+  height: 100%;
+  min-height: 0;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
 .echonotes-editor .cm-editor.cm-focused {
   outline: none;
 }
