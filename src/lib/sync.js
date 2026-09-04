@@ -3,6 +3,7 @@ import { finalizePendingOperations, listPendingOperations, markPendingOperationF
 import { useEcho } from "@/store/echo";
 import { useNotifications } from "@/store/notifications";
 import { usePreferences } from "@/store/preferences";
+import { registerCurrentDevice } from "@/lib/billing";
 
 const activeSyncs = new Map();
 const retryTimers = new Map();
@@ -29,6 +30,13 @@ async function runSync(userId) {
   if (typeof navigator !== "undefined" && !navigator.onLine) {
     useEcho.getState().setSyncState("offline");
     return { ok: false, reason: "offline" };
+  }
+
+  const deviceRegistration = await registerCurrentDevice();
+  if (!deviceRegistration.ok) {
+    useEcho.getState().setSyncState("error");
+    useNotifications.getState().addAlert({ title: "Device limit reached", message: "Basic accounts can sync two devices. Remove an old device in Settings → Billing, or upgrade to Pro.", type: "error" });
+    return { ok: false, reason: "device-limit" };
   }
 
   useEcho.getState().setSyncState("syncing");
@@ -73,6 +81,14 @@ async function runSync(userId) {
     const latestRemote = await fetchRemote(userId);
     if (!isCurrentWorkspace()) return { ok: false, reason: "different-workspace" };
     useEcho.getState().mergeRemote(latestRemote.notes, latestRemote.folders);
+
+    const planFailure = failures.find((failure) => /CLOUD_NOTE_LIMIT_REACHED|SHARE_LINK_LIMIT_REACHED/.test(failure?.message ?? ""));
+    if (planFailure) {
+      useEcho.getState().setSyncState("error");
+      useNotifications.getState().addAlert({ title: "Basic plan limit reached", message: "Your note is still safe offline. Open Settings → Plan & Billing to review your cloud usage.", type: "error" });
+      clearRetry(userId);
+      return { ok: false, reason: "plan-limit", error: planFailure };
+    }
 
     if (failures.length) throw new Error(`${failures.length} queued operation${failures.length === 1 ? "" : "s"} failed`);
 

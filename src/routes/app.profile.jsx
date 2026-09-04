@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEcho } from "@/store/echo";
 import { copyWorkspaceToGuest } from "@/lib/offlineDB";
 import { usePreferences } from "@/store/preferences";
+import { useEffect, useState } from "react";
+import { getBillingOverview } from "@/lib/billing";
 
 export const Route = createFileRoute("/app/profile")({
   component: ProfilePage,
@@ -14,6 +16,14 @@ function ProfilePage() {
   const navigate = useNavigate();
   const setSyncState = useEcho((s) => s.setSyncState);
   const keepDataAfterLogout = usePreferences((s) => s.keepDataAfterLogout);
+  const [billing, setBilling] = useState(null);
+
+  useEffect(() => {
+    if (!user) return setBilling(null);
+    let cancelled = false;
+    void getBillingOverview(user.id).then((overview) => { if (!cancelled) setBilling(overview); }).catch((error) => console.error("Could not load plan", error));
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   async function signOut() {
     if (user && keepDataAfterLogout) await copyWorkspaceToGuest(`user:${user.id}`);
@@ -42,9 +52,9 @@ function ProfilePage() {
             </div>
             <button className="mt-5 w-full rounded-lg border border-border px-4 py-2 text-sm hover:bg-surface">Edit profile</button>
             <div className="mt-5 divide-y divide-border rounded-xl border border-border bg-surface/40 px-4 text-sm">
-              <p className="flex justify-between py-3"><span className="text-muted-foreground">Plan</span><span>Free</span></p>
-              <p className="flex justify-between py-3"><span className="text-muted-foreground">Storage</span><span>120 MB / 1 GB</span></p>
-              <p className="flex justify-between py-3"><span className="text-muted-foreground">Devices</span><span>3 devices</span></p>
+              <p className="flex justify-between py-3"><span className="text-muted-foreground">Plan</span><span className="capitalize">{billing?.plan ?? "Basic"}</span></p>
+              <p className="flex justify-between py-3"><span className="text-muted-foreground">Cloud notes</span><span>{billing?.usage.cloudNotes ?? "—"}{billing?.plan === "pro" ? "" : " / 100"}</span></p>
+              <p className="flex justify-between py-3"><span className="text-muted-foreground">Devices</span><span>{billing?.devices.length ?? "—"} / {billing?.plan === "pro" ? 5 : 2}</span></p>
             </div>
             <button
               onClick={signOut}

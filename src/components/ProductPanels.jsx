@@ -113,7 +113,7 @@ function SharePanel() {
     const id = crypto.randomUUID().replaceAll("-", "").slice(0, 20);
     const { error: shareError } = await supabase.from("note_shares").upsert({ share_id: id, note_id: note.id, user_id: user.id, title: note.title, content: note.content, tags: note.tags ?? [] });
     setBusy(false);
-    if (shareError) return setError(shareError.message);
+    if (shareError) return setError(shareError.message?.includes("SHARE_LINK_LIMIT_REACHED") ? "Basic accounts can have three active public links. Disable an old link or upgrade to Pro." : shareError.message);
     setShareId(id);
   }
 
@@ -224,7 +224,8 @@ function HelpPanel() {
 }
 
 function UpgradePanel() {
-  return <div className="p-6 text-center"><span className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-primary/15 text-primary"><Crown className="size-8" /></span><h3 className="mt-5 text-xl font-semibold">Unlock more with Pro</h3><p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">More storage, unlimited devices, advanced history and priority support.</p><div className="mx-auto mt-6 max-w-xs space-y-3 text-left text-sm">{["Unlimited notes", "Unlimited devices", "10 GB storage", "Advanced note history", "Priority support"].map((item) => <p key={item} className="flex items-center gap-3"><Check className="size-4 text-success" />{item}</p>)}</div><button className="mt-7 h-11 w-full rounded-lg bg-primary text-sm font-medium text-primary-foreground">Upgrade Now</button></div>;
+  const rows = [["Cloud-synced notes", "100", "Unlimited"], ["Synced devices", "2", "5"], ["Public share links", "3", "Unlimited"], ["Offline notes and editor", "Included", "Included"], ["Folders, tags and search", "Included", "Included"], ["Markdown, Live Preview and PDF", "Included", "Included"]];
+  return <div className="p-6"><div className="text-center"><span className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-primary/15 text-primary"><Crown className="size-8" /></span><h3 className="mt-4 text-xl font-semibold">Basic or Pro</h3><p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">The editor stays fully useful for everyone. Pro increases only the cloud features EchoNotes already supports.</p></div><div className="mt-6 overflow-hidden rounded-xl border border-border text-xs sm:text-sm"><div className="grid grid-cols-[1.4fr_.7fr_.7fr] bg-surface px-3 py-3 font-semibold"><span>Feature</span><span className="text-center">Basic</span><span className="text-center text-primary">Pro</span></div>{rows.map(([feature, basic, pro]) => <div key={feature} className="grid grid-cols-[1.4fr_.7fr_.7fr] items-center border-t border-border px-3 py-3"><span>{feature}</span><span className="text-center text-muted-foreground">{basic}</span><span className="text-center font-medium">{pro}</span></div>)}</div><button disabled className="mt-6 h-11 w-full rounded-lg bg-primary text-sm font-medium text-primary-foreground opacity-60">Payment setup is the next step</button><p className="mt-2 text-center text-xs text-muted-foreground">No payment will be collected yet.</p></div>;
 }
 
 function FoldersPanel() {
