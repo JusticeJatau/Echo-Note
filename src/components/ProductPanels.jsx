@@ -68,9 +68,11 @@ function SyncPanel() {
   const dirty = useEcho((s) => s.dirty.length);
   const last = useEcho((s) => s.lastSyncedAt);
   const syncState = useEcho((s) => s.syncState);
+  const headline = !user ? "Sign in to sync" : syncState === "syncing" ? "Syncing your changes…" : syncState === "error" ? "Sync needs another try" : syncState === "offline" ? "Waiting for internet" : dirty ? `${dirty} change${dirty === 1 ? "" : "s"} pending` : "Everything is up to date";
+  const statusColor = syncState === "error" ? "text-destructive" : syncState === "offline" ? "text-warning" : "text-success";
   return <div className="p-6">
-    <div className="py-4 text-center"><span className="mx-auto flex size-14 items-center justify-center rounded-full bg-success/10 text-success"><Check className="size-6" /></span><h3 className="mt-4 text-lg font-semibold text-success">Everything is up to date</h3><p className="mt-1 text-sm text-muted-foreground">Last synced {last ? new Date(last).toLocaleString() : "just now"}</p></div>
-    <div className="mt-4 divide-y divide-border rounded-xl border border-border bg-surface/50 px-4 text-sm"><p className="flex justify-between py-3"><span className="text-muted-foreground">Total notes</span><b>{notes.length}</b></p><p className="flex justify-between py-3"><span className="text-muted-foreground">Pending changes</span><b>{dirty}</b></p><p className="flex justify-between py-3"><span className="text-muted-foreground">Status</span><b className="text-success">Connected</b></p></div>
+    <div className="py-4 text-center"><span className={`mx-auto flex size-14 items-center justify-center rounded-full bg-surface ${statusColor}`}><Check className="size-6" /></span><h3 className={`mt-4 text-lg font-semibold ${statusColor}`}>{headline}</h3><p className="mt-1 text-sm text-muted-foreground">{last ? `Last synced ${new Date(last).toLocaleString()}` : "No completed sync yet"}</p></div>
+    <div className="mt-4 divide-y divide-border rounded-xl border border-border bg-surface/50 px-4 text-sm"><p className="flex justify-between py-3"><span className="text-muted-foreground">Total notes</span><b>{notes.length}</b></p><p className="flex justify-between py-3"><span className="text-muted-foreground">Pending changes</span><b>{dirty}</b></p><p className="flex justify-between py-3"><span className="text-muted-foreground">Status</span><b className={statusColor}>{syncState}</b></p></div>
     <button disabled={!user || syncState === "syncing"} onClick={() => user && void syncNow(user.id)} className="mt-5 h-11 w-full rounded-lg bg-primary text-sm font-medium text-primary-foreground disabled:opacity-50">{!user ? "Sign in to sync" : syncState === "syncing" ? "Syncing…" : "Sync Now"}</button>
   </div>;
 }

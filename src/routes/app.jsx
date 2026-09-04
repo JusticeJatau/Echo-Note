@@ -6,7 +6,7 @@ import { SyncBar } from "@/components/SyncBar";
 import { ProductPanels } from "@/components/ProductPanels";
 import { MobileHeader, MobileNav } from "@/components/MobileNav";
 import { useAuth } from "@/hooks/useAuth";
-import { syncNow } from "@/lib/sync";
+import { syncAfterReconnect, syncNow } from "@/lib/sync";
 import { claimGuestWorkspace, getGuestWorkspaceSummary } from "@/lib/offlineDB";
 import { useEcho } from "@/store/echo";
 import { useNotifications } from "@/store/notifications";
@@ -52,6 +52,23 @@ function AppLayout() {
     });
     return () => { cancelled = true; };
   }, [loading, user?.id, hydrateLocal, setSyncState]);
+
+  useEffect(() => {
+    if (loading || !user || !hydrated || guestData) return;
+    const ownerId = `user:${user.id}`;
+    const handleOnline = () => {
+      if (useEcho.getState().ownerId === ownerId) void syncAfterReconnect(user.id);
+    };
+    const handleOffline = () => {
+      if (useEcho.getState().ownerId === ownerId) useEcho.getState().setSyncState("offline");
+    };
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [loading, user?.id, hydrated, guestData]);
 
   async function addGuestNotesToAccount() {
     if (!user || claiming) return;

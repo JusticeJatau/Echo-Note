@@ -71,7 +71,7 @@ export const useEcho = create((set, get) => ({
     set((state) => ({
       notes: state.notes.filter((note) => note.id !== id),
       activeNoteId: state.activeNoteId === id ? null : state.activeNoteId,
-      dirty: state.dirty.filter((item) => item !== id),
+      dirty: touch(state, id),
       tombstones: { ...state.tombstones, notes: state.tombstones.notes.includes(id) ? state.tombstones.notes : [...state.tombstones.notes, id] },
     }));
     record(get(), "note", id, "delete");
@@ -105,7 +105,7 @@ export const useEcho = create((set, get) => ({
         changedNotes.push(updated);
         return updated;
       }),
-      dirty: state.dirty.filter((item) => item !== id),
+      dirty: [...new Set([...state.dirty, id, ...changedNotes.map((note) => note.id)])],
       tombstones: { ...state.tombstones, folders: state.tombstones.folders.includes(id) ? state.tombstones.folders : [...state.tombstones.folders, id] },
     }));
     const state = get();
@@ -119,15 +119,18 @@ export const useEcho = create((set, get) => ({
     set((state) => ({ dirty: state.dirty.filter((id) => !ids.includes(id)) }));
     persist(get());
   },
+  markCleanLocal: (ids) => set((state) => ({ dirty: state.dirty.filter((id) => !ids.includes(id)) })),
   mergeRemote: (remoteNotes, remoteFolders) => {
     set((state) => {
-      const notes = new Map(state.notes.map((note) => [note.id, note]));
+      const remoteNoteIds = new Set(remoteNotes.map((note) => note.id));
+      const remoteFolderIds = new Set(remoteFolders.map((folder) => folder.id));
+      const notes = new Map(state.notes.filter((note) => state.dirty.includes(note.id) || remoteNoteIds.has(note.id)).map((note) => [note.id, note]));
       for (const remote of remoteNotes) {
         if (state.tombstones.notes.includes(remote.id)) continue;
         const local = notes.get(remote.id);
         if (!local || (!state.dirty.includes(remote.id) && remote.updated_at >= local.updated_at)) notes.set(remote.id, remote);
       }
-      const folders = new Map(state.folders.map((folder) => [folder.id, folder]));
+      const folders = new Map(state.folders.filter((folder) => state.dirty.includes(folder.id) || remoteFolderIds.has(folder.id)).map((folder) => [folder.id, folder]));
       for (const remote of remoteFolders) {
         if (state.tombstones.folders.includes(remote.id)) continue;
         const local = folders.get(remote.id);

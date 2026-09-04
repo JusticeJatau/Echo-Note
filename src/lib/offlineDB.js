@@ -243,6 +243,7 @@ export async function enqueueOperation({ ownerId, entityType, entityId, operatio
 }
 
 export async function listPendingOperations(ownerId) {
+  await (saveChains.get(ownerId) ?? Promise.resolve()).catch(() => {});
   const database = await openOfflineDB();
   if (!database) return [];
   const transaction = database.transaction("operations", "readonly");
@@ -258,6 +259,68 @@ export async function removePendingOperations(ids) {
   const store = transaction.objectStore("operations");
   ids.forEach((id) => store.delete(id));
   await transactionDone(transaction);
+}
+
+async function writePendingOperationFailure(operation, error) {
+  const database = await openOfflineDB();
+  if (!database) return;
+  const transaction = database.transaction("operations", "readwrite");
+  const completed = transactionDone(transaction);
+  const store = transaction.objectStore("operations");
+  const current = await requestResult(store.get(operation.id));
+  if (current?.created_at === operation.created_at) {
+    store.put({
+      ...current,
+      attempts: (current.attempts ?? 0) + 1,
+      last_attempt_at: new Date().toISOString(),
+      last_error: error instanceof Error ? error.message : String(error),
+    });
+  }
+  await completed;
+}
+
+export function markPendingOperationFailed(operation, error) {
+  const ownerId = operation.owner_id;
+  const previous = saveChains.get(ownerId) ?? Promise.resolve();
+  const next = previous.catch(() => {}).then(() => writePendingOperationFailure(operation, error));
+  saveChains.set(ownerId, next);
+  return next;
+}
+
+export function finalizePendingOperations(ownerId, completedOperations) {
+  if (!ownerId || !completedOperations.length) return Promise.resolve([]);
+  const previous = saveChains.get(ownerId) ?? Promise.resolve();
+  const next = previous.catch(() => {}).then(async () => {
+    const database = await openOfflineDB();
+    if (!database) return [];
+    const transaction = database.transaction(["workspaces", "operations"], "readwrite");
+    const completed = transactionDone(transaction);
+    const workspaceStore = transaction.objectStore("workspaces");
+    const operationStore = transaction.objectStore("operations");
+    const workspace = await requestResult(workspaceStore.get(ownerId));
+    const removed = [];
+
+    for (const operation of completedOperations) {
+      const current = await requestResult(operationStore.get(operation.id));
+      if (current?.created_at !== operation.created_at) continue;
+      operationStore.delete(operation.id);
+      removed.push(operation);
+    }
+
+    if (workspace && removed.length) {
+      const cleanIds = new Set(removed.map((operation) => operation.entity_id));
+      workspaceStore.put({
+        ...workspace,
+        dirty: (workspace.dirty ?? []).filter((id) => !cleanIds.has(id)),
+        saved_at: new Date().toISOString(),
+      });
+    }
+
+    await completed;
+    return removed;
+  });
+  saveChains.set(ownerId, next.then(() => undefined));
+  return next;
 }
 
 async function deleteWorkspace(ownerId) {
