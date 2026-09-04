@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 export function MobileHeader() {
   const setCommandOpen = useEcho((s) => s.setCommandOpen);
-  return <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-sidebar px-4 lg:hidden"><button className="rounded-lg p-2 text-muted-foreground"><Menu className="size-5" /></button><div className="flex items-center gap-2"><span className="echo-brand-gradient flex size-7 items-center justify-center rounded-lg text-xs font-bold">E</span><b className="text-sm">Echo8V Notes</b></div><button onClick={() => setCommandOpen(true)} className="rounded-lg p-2 text-muted-foreground"><Search className="size-5" /></button></header>;
+  return <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-sidebar px-4 lg:hidden"><button className="rounded-lg p-2 text-muted-foreground"><Menu className="size-5" /></button><div className="flex items-center gap-2"><img src="/echo8v-logo.png" alt="Echo8V" className="size-8 object-contain" /><b className="text-sm">Echo8V Notes</b></div><button onClick={() => setCommandOpen(true)} className="rounded-lg p-2 text-muted-foreground"><Search className="size-5" /></button></header>;
 }
 
 export function MobileNav() {

@@ -1,15 +1,12 @@
 import { Link } from "@tanstack/react-router";
-import { NotebookPen } from "lucide-react";
 
 export function AuthShell({ title, subtitle, children, footer, error, notice, onGoogle }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-sm">
         <Link to="/app" className="mb-8 flex items-center justify-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-xl echo-brand-gradient">
-            <NotebookPen className="size-5 text-primary-foreground" />
-          </span>
-          <span className="text-lg font-semibold tracking-tight">EchoNotes</span>
+          <img src="/echo8v-logo.png" alt="Echo8V" className="size-11 object-contain" />
+          <span className="text-lg font-semibold tracking-tight">Echo8V Notes</span>
         </Link>
 
         <div className="rounded-2xl border border-border bg-card p-6">

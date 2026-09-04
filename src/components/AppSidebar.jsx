@@ -40,9 +40,7 @@ export function AppSidebar() {
   return (
     <aside className="hidden h-full w-[264px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
       <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="echo-brand-gradient flex size-8 items-center justify-center rounded-lg text-sm font-bold text-primary-foreground">
-          E
-        </div>
+        <img src="/echo8v-logo.png" alt="Echo8V" className="size-9 shrink-0 object-contain" />
         <span className="text-[17px] font-semibold tracking-tight">EchoNotes</span>
       </div>
 
