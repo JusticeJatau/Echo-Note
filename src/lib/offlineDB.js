@@ -50,6 +50,96 @@ export async function loadWorkspace(ownerId) {
   return requestResult(transaction.objectStore("workspaces").get(ownerId));
 }
 
+export async function getGuestWorkspaceSummary() {
+  const guest = await loadWorkspace("guest");
+  return {
+    notes: guest?.notes?.length ?? 0,
+    folders: guest?.folders?.length ?? 0,
+    hasData: !!(guest?.notes?.length || guest?.folders?.length),
+  };
+}
+
+export async function claimGuestWorkspace(ownerId) {
+  if (!ownerId || ownerId === "guest") return { notes: 0, folders: 0 };
+
+  await Promise.all([
+    (saveChains.get("guest") ?? Promise.resolve()).catch(() => {}),
+    (saveChains.get(ownerId) ?? Promise.resolve()).catch(() => {}),
+  ]);
+
+  const database = await openOfflineDB();
+  if (!database) return { notes: 0, folders: 0 };
+
+  const transaction = database.transaction(["workspaces", "operations"], "readwrite");
+  const completed = transactionDone(transaction);
+  const workspaceStore = transaction.objectStore("workspaces");
+  const operationStore = transaction.objectStore("operations");
+  const guest = await requestResult(workspaceStore.get("guest"));
+  const current = await requestResult(workspaceStore.get(ownerId));
+
+  if (!guest?.notes?.length && !guest?.folders?.length) {
+    await completed;
+    return { notes: 0, folders: 0 };
+  }
+
+  const mergeByNewest = (accountItems = [], guestItems = []) => {
+    const merged = new Map(accountItems.map((item) => [item.id, item]));
+    guestItems.forEach((item) => {
+      const existing = merged.get(item.id);
+      if (!existing || (item.updated_at ?? "") > (existing.updated_at ?? "")) merged.set(item.id, item);
+    });
+    return [...merged.values()];
+  };
+
+  const guestNotes = guest.notes ?? [];
+  const guestFolders = guest.folders ?? [];
+  const notes = mergeByNewest(current?.notes, guestNotes).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  const folders = mergeByNewest(current?.folders, guestFolders).sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const claimedIds = [...guestFolders.map((item) => item.id), ...guestNotes.map((item) => item.id)];
+  const dirty = [...new Set([...(current?.dirty ?? []), ...claimedIds])];
+  const tombstones = {
+    notes: current?.tombstones?.notes ?? [],
+    folders: current?.tombstones?.folders ?? [],
+  };
+
+  workspaceStore.put({
+    owner_id: ownerId,
+    notes,
+    folders,
+    dirty,
+    tombstones,
+    lastSyncedAt: current?.lastSyncedAt ?? null,
+    saved_at: new Date().toISOString(),
+  });
+
+  const createdAt = new Date().toISOString();
+  [...guestFolders.map((payload) => ({ entityType: "folder", payload })), ...guestNotes.map((payload) => ({ entityType: "note", payload }))]
+    .forEach(({ entityType, payload }) => {
+      operationStore.put({
+        id: `${ownerId}:${entityType}:${payload.id}`,
+        owner_id: ownerId,
+        entity_type: entityType,
+        entity_id: payload.id,
+        operation: "upsert",
+        payload,
+        created_at: createdAt,
+        attempts: 0,
+      });
+    });
+
+  workspaceStore.delete("guest");
+  const guestOperations = operationStore.index("owner_id").openKeyCursor(IDBKeyRange.only("guest"));
+  guestOperations.onsuccess = () => {
+    const cursor = guestOperations.result;
+    if (!cursor) return;
+    operationStore.delete(cursor.primaryKey);
+    cursor.continue();
+  };
+
+  await completed;
+  return { notes: guestNotes.length, folders: guestFolders.length };
+}
+
 async function writeWorkspace(ownerId, snapshot) {
   const database = await openOfflineDB();
   if (!database) return;
