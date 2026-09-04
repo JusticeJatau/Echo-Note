@@ -140,6 +140,45 @@ export async function claimGuestWorkspace(ownerId) {
   return { notes: guestNotes.length, folders: guestFolders.length };
 }
 
+export async function copyWorkspaceToGuest(ownerId) {
+  if (!ownerId || ownerId === "guest") return { notes: 0, folders: 0 };
+  const [account, guest] = await Promise.all([loadWorkspace(ownerId), loadWorkspace("guest")]);
+  if (!account) return { notes: 0, folders: 0 };
+
+  const mergeByNewest = (guestItems = [], accountItems = []) => {
+    const merged = new Map(guestItems.map((item) => [item.id, item]));
+    accountItems.forEach((item) => {
+      const existing = merged.get(item.id);
+      if (!existing || (item.updated_at ?? "") >= (existing.updated_at ?? "")) merged.set(item.id, item);
+    });
+    return [...merged.values()];
+  };
+
+  const accountNotes = account.notes ?? [];
+  const accountFolders = account.folders ?? [];
+  const notes = mergeByNewest(guest?.notes, accountNotes).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  const folders = mergeByNewest(guest?.folders, accountFolders).sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const copiedIds = [...accountFolders.map((item) => item.id), ...accountNotes.map((item) => item.id)];
+  const copiedNoteIds = new Set(accountNotes.map((item) => item.id));
+  const copiedFolderIds = new Set(accountFolders.map((item) => item.id));
+
+  await commitWorkspaceChange("guest", {
+    notes,
+    folders,
+    dirty: [...new Set([...(guest?.dirty ?? []), ...copiedIds])],
+    tombstones: {
+      notes: (guest?.tombstones?.notes ?? []).filter((id) => !copiedNoteIds.has(id)),
+      folders: (guest?.tombstones?.folders ?? []).filter((id) => !copiedFolderIds.has(id)),
+    },
+    lastSyncedAt: null,
+  }, [
+    ...accountFolders.map((payload) => ({ entityType: "folder", entityId: payload.id, operation: "upsert", payload })),
+    ...accountNotes.map((payload) => ({ entityType: "note", entityId: payload.id, operation: "upsert", payload })),
+  ]);
+
+  return { notes: accountNotes.length, folders: accountFolders.length };
+}
+
 async function writeWorkspace(ownerId, snapshot) {
   const database = await openOfflineDB();
   if (!database) return;

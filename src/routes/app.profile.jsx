@@ -2,6 +2,8 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useEcho } from "@/store/echo";
+import { copyWorkspaceToGuest } from "@/lib/offlineDB";
+import { usePreferences } from "@/store/preferences";
 
 export const Route = createFileRoute("/app/profile")({
   component: ProfilePage,
@@ -11,11 +13,13 @@ function ProfilePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const setSyncState = useEcho((s) => s.setSyncState);
+  const keepDataAfterLogout = usePreferences((s) => s.keepDataAfterLogout);
 
   async function signOut() {
+    if (user && keepDataAfterLogout) await copyWorkspaceToGuest(`user:${user.id}`);
     await supabase.auth.signOut();
     setSyncState("offline");
-    void navigate({ to: "/login", replace: true });
+    void navigate({ to: keepDataAfterLogout ? "/app" : "/login", replace: true });
   }
 
   const name = user?.user_metadata?.["full_name"] ?? "Your account";

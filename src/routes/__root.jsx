@@ -11,6 +11,7 @@ import { useEffect } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { resolveTheme, usePreferences } from "@/store/preferences";
 
 function NotFoundComponent() {
   return (
@@ -116,6 +117,25 @@ function RootShell({ children }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const theme = usePreferences((state) => state.theme);
+  const language = usePreferences((state) => state.language);
+
+  useEffect(() => {
+    const media = matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      const resolved = resolveTheme(theme);
+      document.documentElement.classList.toggle("dark", resolved === "dark");
+      document.documentElement.classList.toggle("light", resolved === "light");
+      document.documentElement.style.colorScheme = resolved;
+    };
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
 
   return (
     <QueryClientProvider client={queryClient}>

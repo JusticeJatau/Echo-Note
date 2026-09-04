@@ -24,6 +24,7 @@ import { useEffect, useRef, useState } from "react";
 import { useEcho, wordCount } from "@/store/echo";
 import { cn } from "@/lib/utils";
 import { LiveMarkdownEditor } from "@/components/LiveMarkdownEditor";
+import { usePreferences } from "@/store/preferences";
 
 const tools = [
   { icon: Heading1, label: "H1", insert: "# " },
@@ -46,6 +47,7 @@ export function NoteEditor({ note }) {
   const [content, setContent] = useState(note.content);
   const [saved, setSaved] = useState(true);
   const editorRef = useRef(null);
+  const autosaveDelay = usePreferences((state) => state.autosaveDelay);
 
   useEffect(() => {
     setTitle(note.title);
@@ -60,9 +62,9 @@ export function NoteEditor({ note }) {
     const t = setTimeout(() => {
       updateNote(note.id, { title, content });
       setSaved(true);
-    }, 500);
+    }, autosaveDelay);
     return () => clearTimeout(t);
-  }, [title, content]);
+  }, [title, content, autosaveDelay]);
 
   const insert = (snippet) => {
     const view = editorRef.current;

@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useEcho } from "@/store/echo";
+import { useAuth } from "@/hooks/useAuth";
+import { syncNow } from "@/lib/sync";
 
 const panelInfo = {
   sync: { title: "Sync Status", icon: RefreshCw },
@@ -57,13 +59,15 @@ function Modal({ title, icon: Icon, children, wide = false }) {
 }
 
 function SyncPanel() {
+  const { user } = useAuth();
   const notes = useEcho((s) => s.notes);
   const dirty = useEcho((s) => s.dirty.length);
   const last = useEcho((s) => s.lastSyncedAt);
+  const syncState = useEcho((s) => s.syncState);
   return <div className="p-6">
     <div className="py-4 text-center"><span className="mx-auto flex size-14 items-center justify-center rounded-full bg-success/10 text-success"><Check className="size-6" /></span><h3 className="mt-4 text-lg font-semibold text-success">Everything is up to date</h3><p className="mt-1 text-sm text-muted-foreground">Last synced {last ? new Date(last).toLocaleString() : "just now"}</p></div>
     <div className="mt-4 divide-y divide-border rounded-xl border border-border bg-surface/50 px-4 text-sm"><p className="flex justify-between py-3"><span className="text-muted-foreground">Total notes</span><b>{notes.length}</b></p><p className="flex justify-between py-3"><span className="text-muted-foreground">Pending changes</span><b>{dirty}</b></p><p className="flex justify-between py-3"><span className="text-muted-foreground">Status</span><b className="text-success">Connected</b></p></div>
-    <button className="mt-5 h-11 w-full rounded-lg bg-primary text-sm font-medium text-primary-foreground">Sync Now</button>
+    <button disabled={!user || syncState === "syncing"} onClick={() => user && void syncNow(user.id)} className="mt-5 h-11 w-full rounded-lg bg-primary text-sm font-medium text-primary-foreground disabled:opacity-50">{!user ? "Sign in to sync" : syncState === "syncing" ? "Syncing…" : "Sync Now"}</button>
   </div>;
 }
 

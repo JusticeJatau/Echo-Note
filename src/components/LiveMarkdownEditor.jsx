@@ -3,7 +3,8 @@ import { markdown } from "@codemirror/lang-markdown";
 import { RangeSetBuilder } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, WidgetType, scrollPastEnd } from "@codemirror/view";
 import { Bold, Code, Heading1, Heading2, Heading3, Italic, Link2, List, Quote, Strikethrough } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { resolveTheme, usePreferences } from "@/store/preferences";
 
 const hidden = Decoration.replace({});
 const syntax = Decoration.mark({ class: "cm-md-syntax" });
@@ -127,11 +128,15 @@ const editorTheme = EditorView.theme({
 }, { dark: true });
 
 export function LiveMarkdownEditor({ value, onChange, editorRef }) {
+  const editorFontSize = usePreferences((state) => state.editorFontSize);
+  const spellCheck = usePreferences((state) => state.spellCheck);
+  const theme = usePreferences((state) => state.theme);
   const [selectionMenu, setSelectionMenu] = useState(null);
   const extensions = useMemo(() => [
     markdown(),
     livePreview(),
     editorTheme,
+    EditorView.theme({ "&": { fontSize: `${editorFontSize}px` } }),
     EditorView.lineWrapping,
     scrollPastEnd(),
     EditorView.updateListener.of((update) => {
@@ -151,7 +156,11 @@ export function LiveMarkdownEditor({ value, onChange, editorRef }) {
         top: showBelow ? Math.max(start.bottom, end.bottom) + 10 : Math.min(start.top, end.top) - 50,
       });
     }),
-  ], []);
+  ], [editorFontSize]);
+
+  useEffect(() => {
+    if (editorRef.current) editorRef.current.contentDOM.spellcheck = spellCheck ? "true" : "false";
+  }, [spellCheck, editorRef]);
 
   const wrapSelection = (before, after = before) => {
     const view = editorRef.current;
@@ -192,7 +201,7 @@ export function LiveMarkdownEditor({ value, onChange, editorRef }) {
   ];
 
   return <div className="relative h-full min-h-0">
-    <CodeMirror className="echonotes-editor" theme="dark" value={value} height="100%" extensions={extensions} basicSetup={{ lineNumbers: false, foldGutter: false, highlightActiveLine: false, highlightActiveLineGutter: false }} onChange={onChange} onCreateEditor={(view) => { editorRef.current = view; }} placeholder="Start writing your thoughts..." />
+    <CodeMirror className="echonotes-editor" theme={resolveTheme(theme)} value={value} height="100%" extensions={extensions} basicSetup={{ lineNumbers: false, foldGutter: false, highlightActiveLine: false, highlightActiveLineGutter: false }} onChange={onChange} onCreateEditor={(view) => { editorRef.current = view; view.contentDOM.spellcheck = spellCheck ? "true" : "false"; }} style={{ fontSize: `${editorFontSize}px` }} placeholder="Start writing your thoughts..." />
     {selectionMenu && <div className="fixed z-[90] flex -translate-x-1/2 items-center gap-0.5 rounded-xl border border-border bg-elevated p-1.5 shadow-2xl" style={{ left: selectionMenu.left, top: selectionMenu.top }} onMouseDown={(event) => event.preventDefault()}>
       {actions.map(([Icon, label, action], index) => <button key={label} type="button" title={label} onMouseDown={(event) => { event.preventDefault(); action(); }} className={`flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-primary/15 hover:text-primary ${index === 3 || index === 6 ? "ml-1 border-l border-border" : ""}`}><Icon className="size-4" /></button>)}
     </div>}
