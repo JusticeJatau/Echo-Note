@@ -4,6 +4,7 @@ const STORAGE_KEY = "echonotes-preferences-v1";
 const defaults = {
   theme: "dark",
   editorFontSize: 16,
+  editorMode: "live-preview",
   spellCheck: true,
   autosaveDelay: 500,
   notifications: false,

@@ -35,13 +35,13 @@ export function Workspace({
   } = useEcho();
 
   const visible = searchNotes(notes.filter(filter), search).sort((a, b) =>
-    b.updated_at.localeCompare(a.updated_at),
+    Number(!!b.is_welcome) - Number(!!a.is_welcome) || b.updated_at.localeCompare(a.updated_at),
   );
   const active = visible.find((n) => n.id === activeNoteId) ?? null;
 
   useEffect(() => {
-    if (!active && visible.length && variant === "notes") setActiveNote(visible[0].id);
-  }, [visible.length, active, variant]);
+    if (activeNoteId && !active && visible.length && variant === "notes") setActiveNote(visible[0].id);
+  }, [visible.length, active, activeNoteId, variant]);
 
   useEffect(() => {
     const savedWidth = Number(localStorage.getItem("echonotes-note-list-width"));
@@ -131,7 +131,7 @@ export function Workspace({
             >
               <div className="flex items-start gap-2">
                 <p className="min-w-0 flex-1 truncate text-sm font-medium"><Highlight text={note.title} query={search}/></p>
-                {note.is_favorite && (
+                {note.is_welcome ? <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">Guide</span> : note.is_favorite && (
                   <Star className="size-3.5 shrink-0 fill-current text-warning" />
                 )}
               </div>
@@ -141,10 +141,10 @@ export function Workspace({
               {(note.tags ?? []).length > 0 && <div className="mt-2 flex flex-wrap gap-1">{note.tags.slice(0, 3).map((tag) => <span key={tag} className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">#{tag}</span>)}</div>}
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-[11px] text-muted-foreground">
-                  {relativeTime(note.updated_at)}
+                  {note.is_welcome ? "Always here" : relativeTime(note.updated_at)}
                 </span>
                 <div className="ml-auto flex items-center gap-1">
-                  {variant === "notes" ? (
+                  {note.is_system ? null : variant === "notes" ? (
                     <>
                       <span
                         role="button"

@@ -1,11 +1,12 @@
 import { create } from "zustand";
 import { clearWorkspace, commitWorkspaceChange, loadWorkspace, migrateLegacyLocalStorage, saveWorkspace } from "@/lib/offlineDB";
 import { normalizeTags } from "@/lib/noteTools";
+import { WELCOME_NOTE, WELCOME_NOTE_ID, withWelcomeNote } from "@/lib/welcomeNote";
 
 const now = () => new Date().toISOString();
 const uid = () => typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const touch = (state, id) => state.dirty.includes(id) ? state.dirty : [...state.dirty, id];
-const snapshot = (state) => ({ notes: state.notes, folders: state.folders, dirty: state.dirty, tombstones: state.tombstones, lastSyncedAt: state.lastSyncedAt });
+const snapshot = (state) => ({ notes: state.notes.filter((note) => !note.is_system), folders: state.folders, dirty: state.dirty.filter((id) => id !== WELCOME_NOTE_ID), tombstones: state.tombstones, lastSyncedAt: state.lastSyncedAt });
 const persist = (state) => void saveWorkspace(state.ownerId, snapshot(state));
 const record = (state, entityType, entityId, operation, payload = null) => {
   void commitWorkspaceChange(state.ownerId, snapshot(state), [{ entityType, entityId, operation, payload }]);
@@ -14,25 +15,36 @@ const record = (state, entityType, entityId, operation, payload = null) => {
 let hydrationSequence = 0;
 
 export const useEcho = create((set, get) => ({
-  notes: [], folders: [], activeNoteId: null, search: "", sidebarOpen: true,
+  notes: [], folders: [], activeNoteId: null, openedNoteIds: [], search: "", sidebarOpen: true,
   commandOpen: false, panel: null, syncState: "offline", lastSyncedAt: null,
   dirty: [], tombstones: { notes: [], folders: [] }, ownerId: null, hydrated: false,
 
   hydrateLocal: async (ownerId) => {
     const sequence = ++hydrationSequence;
-    set({ notes: [], folders: [], activeNoteId: null, dirty: [], tombstones: { notes: [], folders: [] }, ownerId, hydrated: false });
+    set({ notes: [], folders: [], activeNoteId: null, openedNoteIds: [], dirty: [], tombstones: { notes: [], folders: [] }, ownerId, hydrated: false });
     await migrateLegacyLocalStorage();
     const workspace = await loadWorkspace(ownerId);
     if (sequence !== hydrationSequence) return false;
     set({
-      notes: workspace?.notes ?? [], folders: workspace?.folders ?? [], dirty: workspace?.dirty ?? [],
+      notes: withWelcomeNote(workspace?.notes), folders: workspace?.folders ?? [], dirty: (workspace?.dirty ?? []).filter((id) => id !== WELCOME_NOTE_ID),
       tombstones: workspace?.tombstones ?? { notes: [], folders: [] },
-      lastSyncedAt: workspace?.lastSyncedAt ?? null, ownerId, hydrated: true,
+      lastSyncedAt: workspace?.lastSyncedAt ?? null, ownerId, activeNoteId: WELCOME_NOTE_ID, openedNoteIds: [WELCOME_NOTE_ID], hydrated: true,
     });
     return true;
   },
 
-  setActiveNote: (id) => set({ activeNoteId: id }),
+  setActiveNote: (id) => set((state) => ({
+    activeNoteId: id,
+    openedNoteIds: id && !state.openedNoteIds.includes(id) ? [...state.openedNoteIds, id] : state.openedNoteIds,
+  })),
+  closeNoteTab: (id) => set((state) => {
+    const index = state.openedNoteIds.indexOf(id);
+    if (index === -1) return state;
+    const openedNoteIds = state.openedNoteIds.filter((noteId) => noteId !== id);
+    if (state.activeNoteId !== id) return { openedNoteIds };
+    const nextId = openedNoteIds[Math.min(index, openedNoteIds.length - 1)] ?? null;
+    return { openedNoteIds, activeNoteId: nextId };
+  }),
   setSearch: (search) => set({ search }),
   toggleSidebar: () => set((state) => {
     const sidebarOpen = !state.sidebarOpen;
@@ -49,12 +61,13 @@ export const useEcho = create((set, get) => ({
 
   createNote: (folderId = null) => {
     const note = { id: uid(), folder_id: folderId, title: "Untitled Note", content: "", tags: [], is_favorite: false, is_archived: false, is_deleted: false, created_at: now(), updated_at: now() };
-    set((state) => ({ notes: [note, ...state.notes], activeNoteId: note.id, dirty: touch(state, note.id) }));
+    set((state) => ({ notes: [note, ...state.notes], activeNoteId: note.id, openedNoteIds: [...state.openedNoteIds, note.id], dirty: touch(state, note.id) }));
     record(get(), "note", note.id, "upsert", note);
     return note;
   },
 
   updateNote: (id, patch) => {
+    if (id === WELCOME_NOTE_ID) return;
     let updated;
     set((state) => ({
       notes: state.notes.map((note) => {
@@ -71,12 +84,20 @@ export const useEcho = create((set, get) => ({
     const note = get().notes.find((item) => item.id === id);
     if (note) get().updateNote(id, { is_favorite: !note.is_favorite });
   },
-  trashNote: (id) => get().updateNote(id, { is_deleted: true }),
+  trashNote: (id) => {
+    if (id === WELCOME_NOTE_ID) return;
+    get().updateNote(id, { is_deleted: true });
+    get().closeNoteTab(id);
+  },
   restoreNote: (id) => get().updateNote(id, { is_deleted: false }),
   destroyNote: (id) => {
+    if (id === WELCOME_NOTE_ID) return;
     set((state) => ({
       notes: state.notes.filter((note) => note.id !== id),
-      activeNoteId: state.activeNoteId === id ? null : state.activeNoteId,
+      openedNoteIds: state.openedNoteIds.filter((noteId) => noteId !== id),
+      activeNoteId: state.activeNoteId === id
+        ? state.openedNoteIds.filter((noteId) => noteId !== id)[0] ?? null
+        : state.activeNoteId,
       dirty: touch(state, id),
       tombstones: { ...state.tombstones, notes: state.tombstones.notes.includes(id) ? state.tombstones.notes : [...state.tombstones.notes, id] },
     }));
@@ -143,7 +164,7 @@ export const useEcho = create((set, get) => ({
         if (!local || (!state.dirty.includes(remote.id) && remote.updated_at >= local.updated_at)) folders.set(remote.id, remote);
       }
       return {
-        notes: [...notes.values()].sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
+        notes: withWelcomeNote([...notes.values()].sort((a, b) => b.updated_at.localeCompare(a.updated_at))),
         folders: [...folders.values()].sort((a, b) => a.created_at.localeCompare(b.created_at)),
       };
     });
@@ -152,7 +173,7 @@ export const useEcho = create((set, get) => ({
   clearLocal: async () => {
     const ownerId = get().ownerId;
     if (ownerId) await clearWorkspace(ownerId);
-    set({ notes: [], folders: [], dirty: [], activeNoteId: null, tombstones: { notes: [], folders: [] }, lastSyncedAt: null });
+    set({ notes: [WELCOME_NOTE], folders: [], dirty: [], activeNoteId: WELCOME_NOTE_ID, openedNoteIds: [WELCOME_NOTE_ID], tombstones: { notes: [], folders: [] }, lastSyncedAt: null });
   },
 }));
 
