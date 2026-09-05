@@ -4,7 +4,7 @@ export const WELCOME_NOTE = Object.freeze({
   id: WELCOME_NOTE_ID,
   folder_id: null,
   title: "Welcome to EchoNotes 👋",
-  content: `**Your thoughts, organized.**
+  content: `## Your thoughts, organized.
 
 A fast, minimal and offline-first note app designed for developers, creators and thinkers.
 
