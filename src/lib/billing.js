@@ -44,8 +44,11 @@ export async function getBillingOverview(userId) {
   if (missingSchema) return { plan: "basic", status: "active", devices: [], currentDeviceKey: deviceKey, usage: { cloudNotes: noteResult.count ?? 0, shareLinks: shareResult.count ?? 0 }, setupRequired: true };
   const error = subscriptionResult.error || deviceResult.error || noteResult.error || shareResult.error;
   if (error) throw error;
+  const subscription = subscriptionResult.data;
+  const paidThrough = subscription?.current_period_end ? new Date(subscription.current_period_end).getTime() > Date.now() : false;
+  const plan = subscription?.plan === "pro" && (subscription.status === "active" || paidThrough) ? "pro" : "basic";
   return {
-    plan: subscriptionResult.data?.plan ?? "basic",
+    plan,
     status: subscriptionResult.data?.status ?? "active",
     currentPeriodEnd: subscriptionResult.data?.current_period_end ?? null,
     devices: deviceResult.data ?? [],

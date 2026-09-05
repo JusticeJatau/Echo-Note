@@ -31,6 +31,7 @@ import { syncNow } from "@/lib/sync";
 import { useNotifications } from "@/store/notifications";
 import { supabase } from "@/integrations/supabase/client";
 import { downloadText, noteAsMarkdown, parseImportedNote, printNoteAsPdf, safeFilename } from "@/lib/noteTools";
+import { initializeProCheckout } from "@/lib/paystack.functions";
 
 const panelInfo = {
   sync: { title: "Sync Status", icon: RefreshCw },
@@ -224,8 +225,24 @@ function HelpPanel() {
 }
 
 function UpgradePanel() {
+  const { user } = useAuth();
+  const [interval, setInterval] = useState("monthly");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const rows = [["Cloud-synced notes", "100", "Unlimited"], ["Synced devices", "2", "5"], ["Public share links", "3", "Unlimited"], ["Offline notes and editor", "Included", "Included"], ["Folders, tags and search", "Included", "Included"], ["Markdown, Live Preview and PDF", "Included", "Included"]];
-  return <div className="p-6"><div className="text-center"><span className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-primary/15 text-primary"><Crown className="size-8" /></span><h3 className="mt-4 text-xl font-semibold">Basic or Pro</h3><p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">The editor stays fully useful for everyone. Pro increases only the cloud features EchoNotes already supports.</p></div><div className="mt-6 overflow-hidden rounded-xl border border-border text-xs sm:text-sm"><div className="grid grid-cols-[1.4fr_.7fr_.7fr] bg-surface px-3 py-3 font-semibold"><span>Feature</span><span className="text-center">Basic</span><span className="text-center text-primary">Pro</span></div>{rows.map(([feature, basic, pro]) => <div key={feature} className="grid grid-cols-[1.4fr_.7fr_.7fr] items-center border-t border-border px-3 py-3"><span>{feature}</span><span className="text-center text-muted-foreground">{basic}</span><span className="text-center font-medium">{pro}</span></div>)}</div><button disabled className="mt-6 h-11 w-full rounded-lg bg-primary text-sm font-medium text-primary-foreground opacity-60">Payment setup is the next step</button><p className="mt-2 text-center text-xs text-muted-foreground">No payment will be collected yet.</p></div>;
+  async function checkout() {
+    if (!user) return window.location.assign("/login");
+    setBusy(true); setError("");
+    try {
+      const result = await initializeProCheckout({ data: { interval } });
+      window.location.assign(result.authorizationUrl);
+    } catch (checkoutError) {
+      console.error("Could not start checkout", checkoutError);
+      setError(checkoutError.message || "Checkout could not be started. Please try again.");
+      setBusy(false);
+    }
+  }
+  return <div className="max-h-[76vh] overflow-y-auto p-6"><div className="text-center"><span className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-primary/15 text-primary"><Crown className="size-8" /></span><h3 className="mt-4 text-xl font-semibold">Basic or Pro</h3><p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">The editor stays fully useful for everyone. Pro increases only the cloud features EchoNotes already supports.</p></div><div className="mt-5 grid grid-cols-2 gap-2"><button type="button" onClick={() => setInterval("monthly")} className={`rounded-xl border p-3 text-left ${interval === "monthly" ? "border-primary bg-primary/10" : "border-border bg-surface/40"}`}><span className="block text-sm font-semibold">₦1,500</span><span className="text-xs text-muted-foreground">Every month</span></button><button type="button" onClick={() => setInterval("annually")} className={`rounded-xl border p-3 text-left ${interval === "annually" ? "border-primary bg-primary/10" : "border-border bg-surface/40"}`}><span className="block text-sm font-semibold">₦15,000</span><span className="text-xs text-muted-foreground">Every year · Save ₦3,000</span></button></div><div className="mt-5 overflow-hidden rounded-xl border border-border text-xs sm:text-sm"><div className="grid grid-cols-[1.4fr_.7fr_.7fr] bg-surface px-3 py-3 font-semibold"><span>Feature</span><span className="text-center">Basic</span><span className="text-center text-primary">Pro</span></div>{rows.map(([feature, basic, pro]) => <div key={feature} className="grid grid-cols-[1.4fr_.7fr_.7fr] items-center border-t border-border px-3 py-3"><span>{feature}</span><span className="text-center text-muted-foreground">{basic}</span><span className="text-center font-medium">{pro}</span></div>)}</div><button disabled={busy} onClick={() => void checkout()} className="mt-6 h-11 w-full rounded-lg bg-primary text-sm font-medium text-primary-foreground disabled:opacity-50">{!user ? "Sign in to upgrade" : busy ? "Opening secure checkout…" : `Upgrade — ${interval === "monthly" ? "₦1,500 monthly" : "₦15,000 yearly"}`}</button>{error && <p className="mt-3 text-center text-xs text-destructive">{error}</p>}<p className="mt-2 text-center text-xs text-muted-foreground">Secure recurring payment handled by Paystack.</p></div>;
 }
 
 function FoldersPanel() {

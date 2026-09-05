@@ -6,6 +6,8 @@ import { syncNow } from "@/lib/sync";
 import { useEcho } from "@/store/echo";
 import { usePreferences } from "@/store/preferences";
 import { formatLimit, getBillingOverview, PLAN_LIMITS, registerCurrentDevice, removeDevice } from "@/lib/billing";
+import { getSubscriptionManagementLink, verifyProCheckout } from "@/lib/paystack.functions";
+import { useNotifications } from "@/store/notifications";
 
 export const Route = createFileRoute("/app/settings")({ component: SettingsPage });
 
@@ -28,7 +30,7 @@ function UsageRow({ label, used, limit }) {
   return <div className="py-3"><div className="flex items-center justify-between gap-4 text-sm"><span className="text-muted-foreground">{label}</span><b>{used} / {formatLimit(limit)}</b></div>{limit != null && <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2"><span className="block h-full rounded-full bg-primary" style={{ width: `${percentage}%` }}/></div>}</div>;
 }
 
-function BillingSettings({ user, billing, busy, error, onRefresh, onRemoveDevice, onUpgrade }) {
+function BillingSettings({ user, billing, busy, error, onRefresh, onRemoveDevice, onUpgrade, onManage }) {
   if (!user) return <><h2 className="font-semibold">Plan & Billing</h2><p className="mt-1 text-sm text-muted-foreground">Sign in to manage cloud limits and synced devices.</p></>;
   if (!billing && busy) return <><h2 className="font-semibold">Plan & Billing</h2><p className="mt-5 text-sm text-muted-foreground">Loading your plan…</p></>;
   const plan = billing?.plan ?? "basic";
@@ -38,7 +40,7 @@ function BillingSettings({ user, billing, busy, error, onRefresh, onRemoveDevice
     {error && <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">{error}</div>}
     <div className="mt-5 divide-y divide-border rounded-xl border border-border px-4"><UsageRow label="Cloud notes" used={billing?.usage.cloudNotes ?? 0} limit={limits.cloudNotes}/><UsageRow label="Public share links" used={billing?.usage.shareLinks ?? 0} limit={limits.shareLinks}/><UsageRow label="Sync devices" used={billing?.devices.length ?? 0} limit={limits.devices}/></div>
     <div className="mt-6"><div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Registered devices</h3><button type="button" disabled={busy} onClick={() => void onRefresh()} className="text-xs text-primary disabled:opacity-50">Refresh</button></div><div className="mt-2 space-y-2">{billing?.devices.map((device) => { const current = device.device_key === billing.currentDeviceKey; return <div key={device.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface/40 p-3"><Smartphone className="size-4 shrink-0 text-muted-foreground"/><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{device.device_name}{current ? " · This device" : ""}</p><p className="text-[11px] text-muted-foreground">Last used {new Date(device.last_seen_at).toLocaleString()}</p></div>{!current && <button type="button" disabled={busy} onClick={() => void onRemoveDevice(device.id)} title="Remove device" className="rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"><Trash2 className="size-4"/></button>}</div>; })}{!billing?.devices.length && <p className="rounded-xl border border-border p-4 text-center text-xs text-muted-foreground">No registered sync devices yet.</p>}</div></div>
-    {plan === "basic" && <button type="button" onClick={onUpgrade} className="mt-6 h-11 w-full rounded-lg bg-primary text-sm font-medium text-primary-foreground">Compare with Pro</button>}
+    {plan === "basic" ? <button type="button" onClick={onUpgrade} className="mt-6 h-11 w-full rounded-lg bg-primary text-sm font-medium text-primary-foreground">Compare with Pro</button> : <button type="button" disabled={busy} onClick={() => void onManage()} className="mt-6 h-11 w-full rounded-lg border border-border text-sm font-medium hover:bg-surface disabled:opacity-50">Manage Pro subscription</button>}
   </>;
 }
 
@@ -57,6 +59,7 @@ function SettingsPage() {
   const [billing, setBilling] = useState(null);
   const [billingError, setBillingError] = useState("");
   const [billingBusy, setBillingBusy] = useState(false);
+  const addAlert = useNotifications((state) => state.addAlert);
 
   async function refreshStorage() {
     if (navigator.storage?.estimate) setStorage(await navigator.storage.estimate());
@@ -81,6 +84,23 @@ function SettingsPage() {
 
   useEffect(() => { if (user) void refreshBilling(); }, [user?.id]);
 
+  useEffect(() => {
+    if (!user || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const reference = params.get("reference");
+    if (params.get("billing") !== "verify" || !reference) return;
+    setSection("billing");
+    setBillingBusy(true);
+    void verifyProCheckout({ data: { reference } }).then(async () => {
+      await refreshBilling();
+      addAlert({ title: "Welcome to EchoNotes Pro", message: "Your Pro plan is active and your higher cloud limits are ready.", type: "success" });
+      window.history.replaceState({}, "", "/app/settings");
+    }).catch((error) => {
+      console.error("Could not verify payment", error);
+      setBillingError("We could not confirm that payment yet. If you were charged, refresh shortly—the secure webhook will still activate Pro.");
+    }).finally(() => setBillingBusy(false));
+  }, [user?.id]);
+
   async function disconnectDevice(id) {
     setBillingBusy(true);
     setBillingError("");
@@ -91,6 +111,18 @@ function SettingsPage() {
       console.error("Could not remove device", error);
       setBillingError("That device could not be removed. Please try again while online.");
     } finally {
+      setBillingBusy(false);
+    }
+  }
+
+  async function manageSubscription() {
+    setBillingBusy(true); setBillingError("");
+    try {
+      const result = await getSubscriptionManagementLink();
+      window.location.assign(result.url);
+    } catch (error) {
+      console.error("Could not open subscription management", error);
+      setBillingError(error.message || "Subscription management could not be opened.");
       setBillingBusy(false);
     }
   }
@@ -139,7 +171,7 @@ function SettingsPage() {
         {section === "appearance" && <><h2 className="font-semibold">Appearance</h2><p className="mt-1 text-sm text-muted-foreground">Choose how EchoNotes looks on this device.</p><div className="mt-5 flex flex-wrap gap-2">{["dark", "light", "system"].map((theme) => <Choice key={theme} active={preferences.theme === theme} onClick={() => setPreference("theme", theme)}>{theme[0].toUpperCase() + theme.slice(1)}</Choice>)}</div></>}
         {section === "editor" && <><h2 className="font-semibold">Editor</h2><div className="mt-5 space-y-5"><div><p className="mb-2 text-sm text-muted-foreground">Writing mode</p><div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={() => setPreference("editorMode", "live-preview")} className={`rounded-xl border p-3 text-left ${preferences.editorMode === "live-preview" ? "border-primary bg-primary/10" : "border-border bg-surface/40"}`}><span className="text-sm font-medium">Live Preview</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">Hide Markdown symbols except on the line you're editing.</span></button><button type="button" onClick={() => setPreference("editorMode", "source")} className={`rounded-xl border p-3 text-left ${preferences.editorMode === "source" ? "border-primary bg-primary/10" : "border-border bg-surface/40"}`}><span className="text-sm font-medium">Source Mode</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">Always display the complete Markdown syntax.</span></button></div></div><label className="block text-sm"><span className="mb-2 block text-muted-foreground">Text size</span><select value={preferences.editorFontSize} onChange={(e) => setPreference("editorFontSize", Number(e.target.value))} className="h-10 w-full rounded-lg border border-input bg-surface px-3"><option value="14">Small — 14px</option><option value="16">Normal — 16px</option><option value="18">Large — 18px</option><option value="20">Extra large — 20px</option></select></label><label className="block text-sm"><span className="mb-2 block text-muted-foreground">Autosave delay</span><select value={preferences.autosaveDelay} onChange={(e) => setPreference("autosaveDelay", Number(e.target.value))} className="h-10 w-full rounded-lg border border-input bg-surface px-3"><option value="300">Fast — 0.3 seconds</option><option value="500">Normal — 0.5 seconds</option><option value="1000">1 second</option><option value="2000">2 seconds</option></select></label><div className="flex items-center justify-between gap-4"><div><p className="text-sm font-medium">Spell check</p><p className="text-xs text-muted-foreground">Use your browser's spelling suggestions.</p></div><Switch label="Spell check" checked={preferences.spellCheck} onChange={(value) => setPreference("spellCheck", value)} /></div></div></>}
         {section === "sync" && <><h2 className="font-semibold">Sync</h2><p className="mt-1 text-sm text-muted-foreground">{user ? `Status: ${syncState}. ${lastSyncedAt ? `Last synced ${new Date(lastSyncedAt).toLocaleString()}.` : "Not synced yet."}` : "Sign in to sync notes across devices."}</p>{user ? <button type="button" disabled={syncState === "syncing"} onClick={() => void syncNow(user.id)} className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{syncState === "syncing" ? "Syncing…" : "Sync now"}</button> : <button type="button" onClick={() => void navigate({ to: "/login" })} className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Sign in</button>}</>}
-        {section === "billing" && <BillingSettings user={user} billing={billing} busy={billingBusy} error={billingError} onRefresh={refreshBilling} onRemoveDevice={disconnectDevice} onUpgrade={() => useEcho.getState().setPanel("upgrade")} />}
+        {section === "billing" && <BillingSettings user={user} billing={billing} busy={billingBusy} error={billingError} onRefresh={refreshBilling} onRemoveDevice={disconnectDevice} onUpgrade={() => useEcho.getState().setPanel("upgrade")} onManage={manageSubscription} />}
         {section === "privacy" && <><h2 className="font-semibold">Security & Privacy</h2><div className="mt-5 flex items-start justify-between gap-5"><div><p className="text-sm font-medium">Keep notes available after sign-out</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Copies this account's latest notes into the offline guest workspace when you sign out. Anyone using this browser can then read them.</p></div><Switch label="Keep notes after sign-out" checked={preferences.keepDataAfterLogout} onChange={(value) => setPreference("keepDataAfterLogout", value)} /></div><div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs leading-5 text-muted-foreground">When you sign in again, EchoNotes will ask whether to merge the offline copy into your account or keep it separate.</div></>}
         {section === "notifications" && <><h2 className="font-semibold">Notifications</h2><div className="mt-5 flex items-start justify-between gap-5"><div><p className="text-sm font-medium">Sync notifications</p><p className="mt-1 text-xs text-muted-foreground">Notify you when pending offline changes finish syncing.</p></div><Switch label="Sync notifications" checked={preferences.notifications} onChange={(value) => void toggleNotifications(value)} /></div>{typeof Notification !== "undefined" && Notification.permission === "denied" ? <p className="mt-4 text-xs text-destructive">Notifications are blocked in your browser settings.</p> : null}</>}
         {section === "storage" && <><h2 className="font-semibold">Storage</h2><p className="mt-1 text-sm text-muted-foreground">This browser is using approximately {formatBytes(storage.usage)}{storage.quota ? ` of ${formatBytes(storage.quota)} available` : ""}.</p><div className="mt-4 divide-y divide-border rounded-lg border border-border px-3 text-sm"><p className="flex justify-between py-3"><span className="text-muted-foreground">Notes</span><b>{notes.length}</b></p><p className="flex justify-between py-3"><span className="text-muted-foreground">Folders</span><b>{folders.length}</b></p></div><button type="button" onClick={async () => { if (confirm("Remove the active workspace from this device? Cloud data will remain in Supabase.")) { await clearLocal(); await refreshStorage(); } }} className="mt-5 rounded-lg border border-destructive/50 px-3 py-2 text-sm text-destructive hover:bg-destructive/10">Clear this device's workspace</button></>}

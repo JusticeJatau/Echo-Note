@@ -22,6 +22,7 @@ import { Route as AppProfileRouteImport } from './routes/app.profile'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppTrashRouteImport } from './routes/app.trash'
 import { Route as ShareShareIdRouteImport } from './routes/share.$shareId'
+import { Route as ApiPaystackWebhookRouteImport } from './routes/api.paystack.webhook'
 import { Route as AppFoldersFolderIdRouteImport } from './routes/app.folders.$folderId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -89,6 +90,11 @@ const ShareShareIdRoute = ShareShareIdRouteImport.update({
   path: '/share/$shareId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPaystackWebhookRoute = ApiPaystackWebhookRouteImport.update({
+  id: '/api/paystack/webhook',
+  path: '/api/paystack/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppFoldersFolderIdRoute = AppFoldersFolderIdRouteImport.update({
   id: '/folders/$folderId',
   path: '/folders/$folderId',
@@ -109,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/app/trash': typeof AppTrashRoute
   '/share/$shareId': typeof ShareShareIdRoute
   '/app/': typeof AppIndexRoute
+  '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
   '/app/folders/$folderId': typeof AppFoldersFolderIdRoute
 }
 export interface FileRoutesByTo {
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/app/trash': typeof AppTrashRoute
   '/share/$shareId': typeof ShareShareIdRoute
   '/app': typeof AppIndexRoute
+  '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
   '/app/folders/$folderId': typeof AppFoldersFolderIdRoute
 }
 export interface FileRoutesById {
@@ -141,6 +149,7 @@ export interface FileRoutesById {
   '/app/trash': typeof AppTrashRoute
   '/share/$shareId': typeof ShareShareIdRoute
   '/app/': typeof AppIndexRoute
+  '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
   '/app/folders/$folderId': typeof AppFoldersFolderIdRoute
 }
 export interface FileRouteTypes {
@@ -159,6 +168,7 @@ export interface FileRouteTypes {
     | '/app/trash'
     | '/share/$shareId'
     | '/app/'
+    | '/api/paystack/webhook'
     | '/app/folders/$folderId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -174,6 +184,7 @@ export interface FileRouteTypes {
     | '/app/trash'
     | '/share/$shareId'
     | '/app'
+    | '/api/paystack/webhook'
     | '/app/folders/$folderId'
   id:
     | '__root__'
@@ -190,6 +201,7 @@ export interface FileRouteTypes {
     | '/app/trash'
     | '/share/$shareId'
     | '/app/'
+    | '/api/paystack/webhook'
     | '/app/folders/$folderId'
   fileRoutesById: FileRoutesById
 }
@@ -202,6 +214,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
   ShareShareIdRoute: typeof ShareShareIdRoute
+  ApiPaystackWebhookRoute: typeof ApiPaystackWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -297,6 +310,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShareShareIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/paystack/webhook': {
+      id: '/api/paystack/webhook'
+      path: '/api/paystack/webhook'
+      fullPath: '/api/paystack/webhook'
+      preLoaderRoute: typeof ApiPaystackWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app/folders/$folderId': {
       id: '/app/folders/$folderId'
       path: '/folders/$folderId'
@@ -336,6 +356,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   VerifyEmailRoute: VerifyEmailRoute,
   ShareShareIdRoute: ShareShareIdRoute,
+  ApiPaystackWebhookRoute: ApiPaystackWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
