@@ -54,7 +54,7 @@ export async function applySuccessfulTransaction(data) {
   const reference = data.reference;
   if (!reference) throw new Error("Paystack transaction has no reference.");
   const metadata = metadataOf(data);
-  const subscriptionCode = subscriptionCodeOf(data);
+  let subscriptionCode = subscriptionCodeOf(data);
   const customerCode = customerCodeOf(data);
 
   let { data: payment } = await supabaseAdmin.from("payment_transactions").select("*").eq("reference", reference).maybeSingle();
@@ -71,6 +71,23 @@ export async function applySuccessfulTransaction(data) {
   if (!userId || !interval) throw new Error("Could not match this Paystack charge to an EchoNotes account.");
   const plan = getPaystackPlan(interval);
   if (data.currency !== "NGN" || Number(data.amount) !== plan.amount) throw new Error("Paystack amount or currency does not match the selected EchoNotes plan.");
+
+  // Paystack can deliver subscription.create before charge.success, and the
+  // charge payload does not always contain the new subscription code. Resolve
+  // it from Paystack so subscription management never depends on event order.
+  if (!subscriptionCode && customerCode) {
+    try {
+      const subscriptions = await paystackRequest(`/subscription?customer=${encodeURIComponent(customerCode)}`);
+      const candidates = Array.isArray(subscriptions) ? subscriptions : subscriptions?.data ?? [];
+      const matching = candidates.find((item) => {
+        const itemPlanCode = typeof item?.plan === "string" ? item.plan : item?.plan?.plan_code;
+        return itemPlanCode === plan.planCode && !["cancelled", "complete"].includes(item?.status);
+      }) ?? candidates.find((item) => !["cancelled", "complete"].includes(item?.status));
+      subscriptionCode = matching?.subscription_code ?? null;
+    } catch (error) {
+      console.warn("Could not resolve Paystack subscription from charge", error);
+    }
+  }
   const paidAt = data.paid_at ?? data.paidAt ?? new Date().toISOString();
   const nextPayment = data?.subscription?.next_payment_date ?? null;
 
@@ -130,8 +147,6 @@ export async function processPaystackEvent(event) {
         if (data.next_payment_date) update.current_period_end = data.next_payment_date;
         const { error } = await supabaseAdmin.from("subscriptions").update(update).eq("user_id", matched.user_id);
         if (error) throw error;
-      } else if (event.event === "subscription.create") {
-        throw new Error("Subscription arrived before its successful charge; retry this webhook.");
       }
     }
   }
