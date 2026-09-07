@@ -49,10 +49,53 @@ export const verifyProCheckout = createServerFn({ method: "POST" })
 export const getSubscriptionManagementLink = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { paystackRequest } = await import("@/lib/paystack.server");
+    const { findPaystackSubscription, getPaystackPlan, paystackRequest } = await import("@/lib/paystack.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin.from("subscriptions").select("provider_subscription_id").eq("user_id", context.userId).single();
-    if (error || !data?.provider_subscription_id) throw new Error("No active Paystack subscription was found.");
-    const result = await paystackRequest(`/subscription/${encodeURIComponent(data.provider_subscription_id)}/manage/link`);
+    const { data, error } = await supabaseAdmin
+      .from("subscriptions")
+      .select("provider_subscription_id,provider_customer_code,billing_interval")
+      .eq("user_id", context.userId)
+      .single();
+    if (error) throw error;
+
+    let subscriptionCode = data?.provider_subscription_id;
+    let customerCode = data?.provider_customer_code;
+    let interval = data?.billing_interval;
+
+    // Repair subscriptions created before webhook events were processed in
+    // order. The verified charge contains the Paystack customer identifier.
+    if (!subscriptionCode) {
+      const { data: payment, error: paymentError } = await supabaseAdmin
+        .from("payment_transactions")
+        .select("interval,raw_response")
+        .eq("user_id", context.userId)
+        .eq("status", "success")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (paymentError) throw paymentError;
+
+      interval ??= payment?.interval;
+      const rawCustomer = payment?.raw_response?.customer;
+      customerCode ??= typeof rawCustomer === "string" ? rawCustomer : rawCustomer?.customer_code ?? null;
+
+      if (customerCode) {
+        const planCode = interval ? getPaystackPlan(interval).planCode : null;
+        const subscription = await findPaystackSubscription(customerCode, planCode);
+        subscriptionCode = subscription?.subscription_code ?? null;
+        if (subscriptionCode) {
+          const { error: updateError } = await supabaseAdmin.from("subscriptions").update({
+            provider_subscription_id: subscriptionCode,
+            provider_customer_id: customerCode,
+            provider_customer_code: customerCode,
+            provider_email_token: subscription?.email_token ?? null,
+          }).eq("user_id", context.userId);
+          if (updateError) throw updateError;
+        }
+      }
+    }
+
+    if (!subscriptionCode) throw new Error("No active Paystack subscription was found for this billing account.");
+    const result = await paystackRequest(`/subscription/${encodeURIComponent(subscriptionCode)}/manage/link`);
     return { url: result.link };
   });

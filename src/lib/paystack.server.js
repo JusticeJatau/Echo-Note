@@ -39,6 +39,17 @@ function customerCodeOf(data) {
   return typeof data?.customer === "string" ? data.customer : data?.customer?.customer_code ?? data?.customer_code ?? null;
 }
 
+export async function findPaystackSubscription(customerCode, planCode = null) {
+  if (!customerCode) return null;
+  const subscriptions = await paystackRequest(`/subscription?customer=${encodeURIComponent(customerCode)}`);
+  const candidates = Array.isArray(subscriptions) ? subscriptions : subscriptions?.data ?? [];
+  const usable = candidates.filter((item) => !["cancelled", "complete"].includes(item?.status));
+  return usable.find((item) => {
+    const itemPlanCode = typeof item?.plan === "string" ? item.plan : item?.plan?.plan_code;
+    return !planCode || itemPlanCode === planCode;
+  }) ?? usable[0] ?? null;
+}
+
 function periodEnd(paidAt, interval, suggestedDate) {
   const suggested = suggestedDate ? new Date(suggestedDate) : null;
   if (suggested && !Number.isNaN(suggested.getTime()) && suggested > new Date(paidAt)) return suggested.toISOString();
@@ -77,12 +88,7 @@ export async function applySuccessfulTransaction(data) {
   // it from Paystack so subscription management never depends on event order.
   if (!subscriptionCode && customerCode) {
     try {
-      const subscriptions = await paystackRequest(`/subscription?customer=${encodeURIComponent(customerCode)}`);
-      const candidates = Array.isArray(subscriptions) ? subscriptions : subscriptions?.data ?? [];
-      const matching = candidates.find((item) => {
-        const itemPlanCode = typeof item?.plan === "string" ? item.plan : item?.plan?.plan_code;
-        return itemPlanCode === plan.planCode && !["cancelled", "complete"].includes(item?.status);
-      }) ?? candidates.find((item) => !["cancelled", "complete"].includes(item?.status));
+      const matching = await findPaystackSubscription(customerCode, plan.planCode);
       subscriptionCode = matching?.subscription_code ?? null;
     } catch (error) {
       console.warn("Could not resolve Paystack subscription from charge", error);
