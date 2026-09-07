@@ -195,31 +195,59 @@ function NotificationsPanel() {
 }
 
 function HelpPanel() {
+  const { user } = useAuth();
+  const addAlert = useNotifications((state) => state.addAlert);
   const [view, setView] = useState("menu");
+  const [title, setTitle] = useState("");
   const [text, setText] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [submittedId, setSubmittedId] = useState("");
   const items = [[BookOpen, "docs", "Getting started"], [FileText, "shortcuts", "Keyboard shortcuts"], [MessageSquare, "bug", "Report a problem"], [Lightbulb, "feature", "Request a feature"], [HelpCircle, "about", "About Echo8V Notes"]];
-  const copyReport = async (kind) => {
-    if (!text.trim()) return;
-    const report = `${kind}\n\n${text.trim()}\n\nApp: Echo8V Notes\nPlatform: ${navigator.userAgent}\nGenerated: ${new Date().toISOString()}`;
-    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(report);
-    else {
-      const field = document.createElement("textarea");
-      field.value = report;
-      document.body.appendChild(field);
-      field.select();
-      document.execCommand("copy");
-      field.remove();
-    }
-    setCopied(true);
+
+  const draftKey = (type) => `echonotes-feedback-draft-${type}`;
+  const openView = (name) => {
+    setView(name); setError(""); setSubmittedId("");
+    if (name !== "bug" && name !== "feature") { setTitle(""); setText(""); return; }
+    try {
+      const draft = JSON.parse(localStorage.getItem(draftKey(name)) ?? "{}");
+      setTitle(draft.title ?? ""); setText(draft.text ?? "");
+    } catch { setTitle(""); setText(""); }
+  };
+  const updateDraft = (nextTitle, nextText) => {
+    setTitle(nextTitle); setText(nextText); setError("");
+    localStorage.setItem(draftKey(view), JSON.stringify({ title: nextTitle, text: nextText }));
+  };
+  const submitFeedback = async () => {
+    if (!user) return setError("Sign in before submitting. Your draft is saved on this device.");
+    if (!navigator.onLine) return setError("You are offline. Your draft is saved and can be submitted when you reconnect.");
+    if (title.trim().length < 3 || text.trim().length < 10) return setError("Add a short title and at least 10 characters of detail.");
+    setBusy(true); setError("");
+    const { data, error: submitError } = await supabase.from("feedback_submissions").insert({
+      user_id: user.id,
+      type: view,
+      title: title.trim(),
+      description: text.trim(),
+      user_agent: navigator.userAgent,
+      page_url: window.location.href,
+    }).select("id").single();
+    setBusy(false);
+    if (submitError) return setError(submitError.message);
+    localStorage.removeItem(draftKey(view));
+    setSubmittedId(data.id);
+    addAlert({
+      title: view === "bug" ? "Problem report submitted" : "Feature request submitted",
+      message: "Thanks—your feedback was received successfully.",
+      type: "success",
+    });
   };
 
-  if (view === "menu") return <div className="p-3">{items.map(([Icon, name, label]) => <button key={name} onClick={() => { setView(name); setText(""); setCopied(false); }} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm hover:bg-surface"><Icon className="size-4 text-muted-foreground"/><span className="flex-1 text-left">{label}</span><span className="text-muted-foreground">›</span></button>)}</div>;
+  if (view === "menu") return <div className="p-3">{items.map(([Icon, name, label]) => <button key={name} onClick={() => openView(name)} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm hover:bg-surface"><Icon className="size-4 text-muted-foreground"/><span className="flex-1 text-left">{label}</span><span className="text-muted-foreground">›</span></button>)}</div>;
 
   return <div className="max-h-[68vh] overflow-y-auto p-5"><button onClick={() => setView("menu")} className="mb-5 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4"/>Back to Help</button>
     {view === "docs" && <div><h3 className="font-semibold">Getting started</h3><div className="mt-4 space-y-4 text-sm leading-6 text-muted-foreground"><p><b className="text-foreground">Create:</b> Select New Note, add a title, then start writing. Changes save automatically to this device.</p><p><b className="text-foreground">Format:</b> Highlight text to open the formatting menu, or use the editor toolbar.</p><p><b className="text-foreground">Tags:</b> Add tags below a note title and select a sidebar tag to filter your notes.</p><p><b className="text-foreground">Link:</b> Type <code>[[Note Title]]</code> to connect notes. Links and backlinks appear below the editor.</p><p><b className="text-foreground">Import:</b> Use Import in the sidebar or command menu for Markdown and text files.</p><p><b className="text-foreground">Sync:</b> Sign in and choose Sync Now. Offline changes remain queued until your connection returns.</p><p><b className="text-foreground">Recover:</b> Deleted notes remain in Trash until you permanently remove them.</p></div></div>}
     {view === "shortcuts" && <div><h3 className="font-semibold">Keyboard shortcuts</h3><div className="mt-4 divide-y divide-border rounded-xl border border-border px-4 text-sm">{[["Ctrl / ⌘ + K", "Open command search"], ["Ctrl / ⌘ + F", "Find and replace in editor"], ["Ctrl / ⌘ + B", "Bold selected text"], ["Ctrl / ⌘ + I", "Italicize selected text"], ["Ctrl / ⌘ + S", "Save immediately"], ["Ctrl / ⌘ + Z", "Undo editing"], ["Escape", "Close a menu or dialog"]].map(([keys, action]) => <p key={keys} className="flex items-center justify-between gap-4 py-3"><span className="text-muted-foreground">{action}</span><kbd className="rounded border border-border bg-surface px-2 py-1 text-xs">{keys}</kbd></p>)}</div></div>}
-    {(view === "bug" || view === "feature") && <div><h3 className="font-semibold">{view === "bug" ? "Report a problem" : "Request a feature"}</h3><p className="mt-1 text-sm text-muted-foreground">{view === "bug" ? "Describe what happened, what you expected, and how to reproduce it." : "Explain what you want to do and why it would help."}</p><textarea value={text} onChange={(event) => { setText(event.target.value); setCopied(false); }} rows={7} placeholder={view === "bug" ? "Example: I was editing a note when…" : "It would be useful if EchoNotes could…"} className="mt-4 w-full resize-none rounded-xl border border-input bg-surface p-3 text-sm outline-none focus:border-ring"/><button disabled={!text.trim()} onClick={() => void copyReport(view === "bug" ? "EchoNotes bug report" : "EchoNotes feature request")} className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground disabled:opacity-50"><Copy className="size-4"/>{copied ? "Copied — ready to share" : "Copy report"}</button><p className="mt-2 text-center text-xs text-muted-foreground">The report stays on your device until you choose where to send it.</p></div>}
+    {(view === "bug" || view === "feature") && (submittedId ? <div className="py-8 text-center"><span className="mx-auto flex size-14 items-center justify-center rounded-full bg-success/15 text-success"><CheckCircle2 className="size-7"/></span><h3 className="mt-4 font-semibold">{view === "bug" ? "Problem reported" : "Feature requested"}</h3><p className="mt-2 text-sm text-muted-foreground">Thanks—your feedback has been received.</p><p className="mt-2 text-xs text-muted-foreground">Reference: {submittedId.slice(0, 8).toUpperCase()}</p><button onClick={() => { setSubmittedId(""); setTitle(""); setText(""); }} className="mt-5 rounded-lg border border-border px-4 py-2 text-sm hover:bg-surface">Submit another</button></div> : <div><h3 className="font-semibold">{view === "bug" ? "Report a problem" : "Request a feature"}</h3><p className="mt-1 text-sm text-muted-foreground">{view === "bug" ? "Describe what happened, what you expected, and how to reproduce it." : "Explain what you want to do and why it would help."}</p><label className="mt-4 block text-xs font-medium text-muted-foreground">Title</label><input value={title} maxLength={120} onChange={(event) => updateDraft(event.target.value, text)} placeholder={view === "bug" ? "Example: Note does not save" : "Example: Add calendar view"} className="mt-2 h-10 w-full rounded-xl border border-input bg-surface px-3 text-sm outline-none focus:border-ring"/><label className="mt-4 block text-xs font-medium text-muted-foreground">Details</label><textarea value={text} maxLength={5000} onChange={(event) => updateDraft(title, event.target.value)} rows={7} placeholder={view === "bug" ? "What happened? What did you expect? How can we reproduce it?" : "What should EchoNotes do, and how would it help you?"} className="mt-2 w-full resize-none rounded-xl border border-input bg-surface p-3 text-sm outline-none focus:border-ring"/><div className="mt-2 flex justify-between text-[11px] text-muted-foreground"><span>Draft saved automatically</span><span>{text.length}/5000</span></div>{error && <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">{error}</p>}<button disabled={busy || title.trim().length < 3 || text.trim().length < 10} onClick={() => void submitFeedback()} className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground disabled:opacity-50">{busy ? <><RefreshCw className="size-4 animate-spin"/>Submitting…</> : <><MessageSquare className="size-4"/>{user ? "Submit feedback" : "Sign in to submit"}</>}</button><p className="mt-2 text-center text-xs text-muted-foreground">Technical browser details are included automatically with problem reports.</p></div>)}
     {view === "about" && <div className="text-center"><img src="/echo8v-logo.png" alt="Echo8V" className="mx-auto size-20 object-contain"/><h3 className="mt-4 text-lg font-semibold">Echo8V Notes</h3><p className="mt-1 text-xs text-muted-foreground">Offline-first beta</p><p className="mx-auto mt-5 max-w-sm text-sm leading-6 text-muted-foreground">A focused personal notes workspace built by Echo8V. Your notes are written locally first and can sync securely when you sign in.</p><div className="mt-5 rounded-xl border border-border bg-surface/40 p-4 text-left text-xs text-muted-foreground"><p className="flex justify-between"><span>Local storage</span><span className="text-success">Enabled</span></p><p className="mt-3 flex justify-between"><span>Markdown editor</span><span className="text-success">Enabled</span></p><p className="mt-3 flex justify-between"><span>Cloud sync</span><span>Supabase</span></p></div></div>}
   </div>;
 }
