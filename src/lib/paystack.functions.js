@@ -49,7 +49,7 @@ export const verifyProCheckout = createServerFn({ method: "POST" })
 export const getSubscriptionManagementLink = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { findPaystackSubscription, getPaystackPlan, paystackRequest } = await import("@/lib/paystack.server");
+    const { findPaystackSubscription, getPaystackPlan, paystackRequest, subscriptionFromStoredEvents } = await import("@/lib/paystack.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
       .from("subscriptions")
@@ -62,8 +62,33 @@ export const getSubscriptionManagementLink = createServerFn({ method: "POST" })
     let customerCode = data?.provider_customer_code;
     let interval = data?.billing_interval;
 
-    // Repair subscriptions created before webhook events were processed in
-    // order. The verified charge contains the Paystack customer identifier.
+    // First recover directly from the stored subscription.create webhook. This
+    // is the authoritative source for the SUB_ code and also repairs events
+    // that arrived before charge.success linked the Paystack customer to us.
+    if (!subscriptionCode) {
+      const { data: events, error: eventError } = await supabaseAdmin
+        .from("billing_events")
+        .select("payload")
+        .eq("event_type", "subscription.create")
+        .order("processed_at", { ascending: false })
+        .limit(100);
+      if (eventError) throw eventError;
+      const recovered = subscriptionFromStoredEvents(events, context.claims.email, customerCode);
+      if (recovered) {
+        customerCode ??= recovered.customerCode;
+        subscriptionCode = recovered.subscriptionCode;
+        const { error: updateError } = await supabaseAdmin.from("subscriptions").update({
+          provider_subscription_id: subscriptionCode,
+          provider_customer_id: customerCode,
+          provider_customer_code: customerCode,
+          provider_email_token: recovered.emailToken,
+        }).eq("user_id", context.userId);
+        if (updateError) throw updateError;
+      }
+    }
+
+    // Fall back to the verified charge and Paystack API for accounts whose
+    // subscription.create event was not retained.
     if (!subscriptionCode) {
       const { data: payment, error: paymentError } = await supabaseAdmin
         .from("payment_transactions")

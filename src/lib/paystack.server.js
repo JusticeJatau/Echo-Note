@@ -50,6 +50,21 @@ export async function findPaystackSubscription(customerCode, planCode = null) {
   }) ?? usable[0] ?? null;
 }
 
+export function subscriptionFromStoredEvents(events, accountEmail, knownCustomerCode = null) {
+  const normalizedEmail = String(accountEmail ?? "").trim().toLowerCase();
+  for (const row of events ?? []) {
+    const data = row?.payload?.data ?? {};
+    const customer = data?.customer;
+    const email = String(customer?.email ?? data?.email ?? "").trim().toLowerCase();
+    const customerCode = typeof customer === "string" ? customer : customer?.customer_code ?? data?.customer_code ?? null;
+    const matches = (normalizedEmail && email === normalizedEmail) || (knownCustomerCode && customerCode === knownCustomerCode);
+    if (matches && data?.subscription_code) {
+      return { subscriptionCode: data.subscription_code, customerCode, emailToken: data.email_token ?? null };
+    }
+  }
+  return null;
+}
+
 function periodEnd(paidAt, interval, suggestedDate) {
   const suggested = suggestedDate ? new Date(suggestedDate) : null;
   if (suggested && !Number.isNaN(suggested.getTime()) && suggested > new Date(paidAt)) return suggested.toISOString();
