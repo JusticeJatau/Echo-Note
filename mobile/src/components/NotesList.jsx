@@ -1,8 +1,9 @@
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { FileText, Star } from "lucide-react-native";
-import { colors } from "../theme";
+import { useAppTheme } from "../theme/ThemeProvider";
 export function NotesList({ notes, empty = "No notes yet", onOpen }) {
-  const styles = createStyles();
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   return (
     <FlatList
       data={notes}
@@ -35,7 +36,7 @@ export function NotesList({ notes, empty = "No notes yet", onOpen }) {
     />
   );
 }
-const createStyles = () =>
+const createStyles = (colors) =>
   StyleSheet.create({
     list: { padding: 16, paddingBottom: 110, gap: 10 },
     empty: { flexGrow: 1, justifyContent: "center" },

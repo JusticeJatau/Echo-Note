@@ -11,10 +11,9 @@ import {
   Switch,
   Text,
   TextInput,
-  useColorScheme,
   View,
 } from "react-native";
-import { NavigationContainer, DarkTheme } from "@react-navigation/native";
+import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -27,8 +26,11 @@ import {
   Bell,
   Bold,
   Check,
+  ChevronDown,
   Cloud,
   Code,
+  CreditCard,
+  Database,
   Download,
   Eye,
   FileCode2,
@@ -40,6 +42,7 @@ import {
   LogIn,
   LogOut,
   MoreHorizontal,
+  Palette,
   Plus,
   Quote,
   RotateCcw,
@@ -48,6 +51,7 @@ import {
   Share2,
   Star,
   Strikethrough,
+  Smartphone,
   Trash2,
   User,
   Wifi,
@@ -60,7 +64,8 @@ import { usePreferences } from "./src/store/preferences";
 import { useAlerts } from "./src/store/alerts";
 import { NotesList } from "./src/components/NotesList";
 import { MarkdownPreview } from "./src/components/MarkdownPreview";
-import { applyTheme, colors } from "./src/theme";
+import { colors } from "./src/theme";
+import { ThemeProvider, useAppTheme } from "./src/theme/ThemeProvider";
 import { startAutoSync, syncNow } from "./src/lib/sync";
 import {
   billingOverview,
@@ -73,18 +78,6 @@ import { supabase } from "./src/lib/supabase";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
-const navigationTheme = () => ({
-  ...DarkTheme,
-  dark: colors.background === "#090b10",
-  colors: {
-    ...DarkTheme.colors,
-    primary: colors.primary,
-    background: colors.background,
-    card: colors.surface,
-    border: colors.border,
-    text: colors.text,
-  },
-});
 const owner = () => useAuthStore.getState().session?.user?.id ?? "guest";
 
 function Header({ title, back, navigation, right }) {
@@ -133,13 +126,29 @@ function Login({ navigation }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState(false);
   async function submit() {
+    if (busy) return;
     setBusy(true);
-    const r = await signIn(email.trim(), password);
-    setBusy(false);
-    if (r.error) setError(r.error.message);
-    else navigation.goBack();
+    setError("");
+    setSuccess("");
+    try {
+      const r = await signIn(email.trim(), password);
+      if (r.error) return setError(r.error.message);
+      setSuccess("Signed in successfully. Preparing your workspace…");
+      setTimeout(
+        () => navigation.reset({ index: 0, routes: [{ name: "Home" }] }),
+        450,
+      );
+    } catch (requestError) {
+      setError(
+        requestError?.message ??
+          "Could not sign in. Check your connection and try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
   return (
     <SafeAreaView style={s.auth}>
@@ -166,8 +175,14 @@ function Login({ navigation }) {
         placeholderTextColor={colors.muted}
       />
       {!!error && <Text style={s.error}>{error}</Text>}
+      {!!success && (
+        <View style={s.successBox}>
+          <Check size={18} color={colors.success} />
+          <Text style={s.successText}>{success}</Text>
+        </View>
+      )}
       <Button disabled={busy} onPress={submit}>
-        {busy ? "Signing in…" : "Sign in"}
+        {success ? "Signed in" : busy ? "Signing in…" : "Sign in"}
       </Button>
       <Pressable onPress={() => navigation.navigate("Signup")}>
         <Text style={s.link}>Create account</Text>
@@ -717,125 +732,212 @@ function SettingsScreen({ navigation }) {
   const signOut = useAuthStore((x) => x.signOut);
   const p = usePreferences();
   const status = useNotesStore((x) => x.syncState);
+  const [overview, setOverview] = useState(null);
+  useEffect(() => {
+    if (session?.user)
+      billingOverview(session.user.id)
+        .then(setOverview)
+        .catch(() => setOverview(null));
+    else setOverview(null);
+  }, [session?.user?.id]);
   return (
     <SafeAreaView style={s.page}>
-      <Text style={s.pageTitlePad}>Settings</Text>
-      <ScrollView contentContainerStyle={s.pad}>
+      <View style={s.settingsHeader}>
+        <Text style={s.pageTitle}>Settings</Text>
+        <Text style={s.settingsSubtitle}>Make EchoNotes work your way</Text>
+      </View>
+      <ScrollView
+        contentContainerStyle={s.settingsContent}
+        showsVerticalScrollIndicator={false}
+      >
         <Pressable
-          style={s.cardRow}
+          style={s.accountCard}
           onPress={() => navigation.navigate(session ? "Profile" : "Login")}
         >
-          <User color={colors.primary} />
+          <View style={s.accountAvatar}>
+            <User color={colors.primary} size={22} />
+          </View>
           <View style={{ flex: 1 }}>
-            <Text style={s.value}>
-              {session?.user?.email ?? "Offline guest"}
+            <Text style={s.accountName}>
+              {session?.user?.user_metadata?.full_name ||
+                (session ? "Your account" : "Offline guest")}
             </Text>
             <Text style={s.small}>
-              {session ? "Profile and account" : "Tap to sign in and sync"}
+              {session?.user?.email ?? "Tap to sign in and sync"}
             </Text>
           </View>
+          <ChevronDown
+            color={colors.muted}
+            size={18}
+            style={{ transform: [{ rotate: "-90deg" }] }}
+          />
         </Pressable>
-        <Row
-          label="Theme"
-          value={
-            p.theme === "system"
-              ? "System"
-              : p.theme === "light"
-                ? "Light"
-                : "Dark"
-          }
-          onPress={() =>
-            p.setPreference(
-              "theme",
-              p.theme === "dark"
-                ? "light"
-                : p.theme === "light"
-                  ? "system"
-                  : "dark",
-            )
-          }
-        />
-        <Row
-          label="Editor mode"
-          value={p.editorMode === "live-preview" ? "Live Preview" : "Source"}
-          onPress={() =>
-            p.setPreference(
-              "editorMode",
-              p.editorMode === "live-preview" ? "source" : "live-preview",
-            )
-          }
-        />
-        <Toggle
-          label="Spell check"
-          value={p.spellCheck}
-          onChange={(v) => p.setPreference("spellCheck", v)}
-        />
-        <Toggle
-          label="Keep data after sign out"
-          value={p.keepDataAfterLogout}
-          onChange={(v) => p.setPreference("keepDataAfterLogout", v)}
-        />
-        <Row
-          label="Editor font size"
-          value={`${p.editorFontSize}px`}
-          onPress={() =>
-            p.setPreference(
-              "editorFontSize",
-              p.editorFontSize >= 20 ? 14 : p.editorFontSize + 2,
-            )
-          }
-        />
-        <Pressable
-          style={s.cardRow}
-          onPress={() => session && syncNow(session.user.id)}
-        >
-          {status === "offline" ? (
-            <WifiOff color={colors.warning} />
-          ) : (
-            <Cloud color={colors.success} />
-          )}
-          <View>
-            <Text style={s.value}>Cloud sync</Text>
-            <Text style={s.small}>
-              {session ? status : "Sign in to enable"}
-            </Text>
-          </View>
-        </Pressable>
+
         {session && (
-          <>
-            <Row
-              label="Billing & plan"
-              value="Manage"
-              onPress={() => navigation.navigate("Billing")}
-            />
-            <Row
-              label="Devices"
-              value="Manage"
+          <Pressable
+            style={s.planCard}
+            onPress={() => navigation.navigate("Billing")}
+          >
+            <View style={s.planTop}>
+              <View>
+                <Text style={s.planEyebrow}>CURRENT PLAN</Text>
+                <Text style={s.planName}>
+                  {overview?.plan === "pro"
+                    ? "EchoNotes Pro"
+                    : "EchoNotes Basic"}
+                </Text>
+              </View>
+              <View style={s.planBadge}>
+                <Text style={s.planBadgeText}>
+                  {overview?.plan === "pro" ? "PRO" : "FREE"}
+                </Text>
+              </View>
+            </View>
+            <Text style={s.planDescription}>
+              {overview?.plan === "pro"
+                ? "Unlimited cloud notes and public links · 5 devices"
+                : "100 cloud notes · 3 public links · 2 devices"}
+            </Text>
+            <View style={s.planFooter}>
+              <Text style={s.planAction}>
+                {overview?.plan === "pro"
+                  ? "Manage subscription"
+                  : "View plans and upgrade"}
+              </Text>
+              <ChevronDown
+                color={colors.primary}
+                size={17}
+                style={{ transform: [{ rotate: "-90deg" }] }}
+              />
+            </View>
+          </Pressable>
+        )}
+
+        <SectionLabel icon={Palette} title="Appearance" />
+        <View style={s.settingsGroup}>
+          <SelectRow
+            label="Theme"
+            value={p.theme}
+            options={[
+              { label: "Dark", value: "dark" },
+              { label: "Light", value: "light" },
+              { label: "System", value: "system" },
+            ]}
+            onChange={(value) => p.setPreference("theme", value)}
+          />
+        </View>
+
+        <SectionLabel icon={FileText} title="Editor" />
+        <View style={s.settingsGroup}>
+          <SelectRow
+            label="Editor mode"
+            value={p.editorMode}
+            options={[
+              { label: "Live Preview", value: "live-preview" },
+              { label: "Source", value: "source" },
+            ]}
+            onChange={(value) => p.setPreference("editorMode", value)}
+          />
+          <Toggle
+            label="Spell check"
+            value={p.spellCheck}
+            onChange={(v) => p.setPreference("spellCheck", v)}
+          />
+          <SelectRow
+            label="Editor font size"
+            value={p.editorFontSize}
+            options={[14, 16, 18, 20, 22, 24].map((value) => ({
+              label: `${value}px`,
+              value,
+            }))}
+            onChange={(value) => p.setPreference("editorFontSize", value)}
+          />
+          <SelectRow
+            label="Autosave delay"
+            value={p.autosaveDelay}
+            options={[
+              { label: "Instant (250ms)", value: 250 },
+              { label: "Normal (500ms)", value: 500 },
+              { label: "Relaxed (1000ms)", value: 1000 },
+            ]}
+            onChange={(value) => p.setPreference("autosaveDelay", value)}
+          />
+        </View>
+
+        <SectionLabel icon={Database} title="Data and sync" />
+        <View style={s.settingsGroup}>
+          <Toggle
+            label="Keep data after sign out"
+            value={p.keepDataAfterLogout}
+            onChange={(v) => p.setPreference("keepDataAfterLogout", v)}
+          />
+          <SelectRow
+            label="Language"
+            value={p.language}
+            options={[{ label: "English", value: "en" }]}
+            onChange={(value) => p.setPreference("language", value)}
+          />
+          <Pressable
+            style={s.setting}
+            onPress={() => session && syncNow(session.user.id)}
+          >
+            {status === "offline" ? (
+              <WifiOff color={colors.warning} />
+            ) : (
+              <Cloud color={colors.success} />
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={s.value}>Cloud sync</Text>
+              <Text style={s.small}>
+                {session ? status : "Sign in to enable"}
+              </Text>
+            </View>
+            {session && (
+              <ChevronDown
+                color={colors.muted}
+                size={17}
+                style={{ transform: [{ rotate: "-90deg" }] }}
+              />
+            )}
+          </Pressable>
+          {session && (
+            <NavigationRow
+              icon={Smartphone}
+              label="Synced devices"
+              detail={`${overview?.devices?.length ?? 0} connected`}
               onPress={() => navigation.navigate("Devices")}
             />
-          </>
-        )}
-        <Row
-          label="Import notes"
-          value=".md or .txt"
-          onPress={async () => {
-            for (const item of await pickNotes()) {
-              const n = await useNotesStore.getState().create();
-              await useNotesStore.getState().update(n.id, item);
-            }
-            Alert.alert("Import complete");
-          }}
-        />
-        <Row
-          label="Alerts"
-          value="Open"
-          onPress={() => navigation.navigate("Alerts")}
-        />
-        <Row
-          label="Help & feedback"
-          value="Open"
-          onPress={() => navigation.navigate("Help")}
-        />
+          )}
+          <NavigationRow
+            icon={Download}
+            label="Import notes"
+            detail="Markdown or text"
+            onPress={async () => {
+              for (const item of await pickNotes()) {
+                const n = await useNotesStore.getState().create();
+                await useNotesStore.getState().update(n.id, item);
+              }
+              Alert.alert("Import complete");
+            }}
+          />
+        </View>
+
+        <SectionLabel icon={HelpCircle} title="Support" />
+        <View style={s.settingsGroup}>
+          <NavigationRow
+            icon={Bell}
+            label="Alerts"
+            detail="Sync and account activity"
+            onPress={() => navigation.navigate("Alerts")}
+          />
+          <NavigationRow
+            icon={HelpCircle}
+            label="Help and feedback"
+            detail="Guides, problems and ideas"
+            onPress={() => navigation.navigate("Help")}
+          />
+        </View>
+
         {session ? (
           <Button kind="danger" onPress={() => signOut()}>
             Sign out
@@ -845,8 +947,37 @@ function SettingsScreen({ navigation }) {
             Sign in to sync
           </Button>
         )}
+        <Text style={s.settingsVersion}>EchoNotes Mobile · Version 0.1.0</Text>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+function SectionLabel({ icon: Icon, title }) {
+  return (
+    <View style={s.sectionLabel}>
+      <Icon size={15} color={colors.primary} />
+      <Text style={s.sectionLabelText}>{title}</Text>
+    </View>
+  );
+}
+function NavigationRow({ icon: Icon, label, detail, onPress }) {
+  return (
+    <Pressable style={s.setting} onPress={onPress}>
+      <View style={s.settingLeading}>
+        <View style={s.settingIcon}>
+          <Icon size={18} color={colors.primary} />
+        </View>
+        <View>
+          <Text style={s.value}>{label}</Text>
+          <Text style={s.small}>{detail}</Text>
+        </View>
+      </View>
+      <ChevronDown
+        color={colors.muted}
+        size={17}
+        style={{ transform: [{ rotate: "-90deg" }] }}
+      />
+    </Pressable>
   );
 }
 function Toggle({ label, value, onChange }) {
@@ -861,12 +992,50 @@ function Toggle({ label, value, onChange }) {
     </View>
   );
 }
-function Row({ label, value, onPress }) {
+function SelectRow({ label, value, options, onChange }) {
+  const [open, setOpen] = useState(false);
+  const selected =
+    options.find((option) => option.value === value) ?? options[0];
   return (
-    <Pressable style={s.setting} onPress={onPress}>
-      <Text style={s.value}>{label}</Text>
-      <Text style={s.small}>{value}</Text>
-    </Pressable>
+    <>
+      <Pressable style={s.setting} onPress={() => setOpen(true)}>
+        <Text style={s.value}>{label}</Text>
+        <View style={s.selectValue}>
+          <Text style={s.small}>{selected?.label}</Text>
+          <ChevronDown size={16} color={colors.muted} />
+        </View>
+      </Pressable>
+      <Modal
+        transparent
+        visible={open}
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+      >
+        <Pressable style={s.modalShade} onPress={() => setOpen(false)}>
+          <View style={s.selectSheet}>
+            <Text style={s.selectTitle}>{label}</Text>
+            {options.map((option) => (
+              <Pressable
+                key={String(option.value)}
+                style={[
+                  s.selectOption,
+                  option.value === value && s.selectedOption,
+                ]}
+                onPress={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+              >
+                <Text style={s.value}>{option.label}</Text>
+                {option.value === value && (
+                  <Check size={18} color={colors.primary} />
+                )}
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 function Profile({ navigation }) {
@@ -911,33 +1080,120 @@ function Billing({ navigation }) {
   }, []);
   return (
     <SafeAreaView style={s.page}>
-      <Header title="Billing" back navigation={navigation} />
-      <View style={s.pad}>
-        <Text style={s.authTitle}>
-          {data?.plan === "pro" ? "Pro" : "Basic"}
-        </Text>
-        <Text style={s.muted}>
-          Basic: 100 cloud notes, 2 devices, 3 share links.{"\n"}Pro: unlimited
-          cloud notes, 5 devices, unlimited links.
-        </Text>
-        <View style={s.card}>
-          <Text style={s.value}>Cloud notes: {data?.notes ?? "—"}</Text>
-          <Text style={s.value}>Share links: {data?.shares ?? "—"}</Text>
-          {data?.periodEnd && (
-            <Text style={s.small}>
-              Paid through {new Date(data.periodEnd).toLocaleDateString()}
+      <Header title="Plan and billing" back navigation={navigation} />
+      <ScrollView
+        contentContainerStyle={s.billingContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {!data ? (
+          <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
+        ) : (
+          <>
+            <View style={s.billingHero}>
+              <View style={s.billingIcon}>
+                <CreditCard color={colors.primary} size={24} />
+              </View>
+              <Text style={s.planEyebrow}>YOUR CURRENT PLAN</Text>
+              <Text style={s.billingPlan}>
+                {data.plan === "pro" ? "EchoNotes Pro" : "EchoNotes Basic"}
+              </Text>
+              <Text style={s.billingLead}>
+                {data.plan === "pro"
+                  ? "Everything you need, with room to grow."
+                  : "All the essentials for personal note-taking."}
+              </Text>
+              {data.periodEnd && (
+                <View style={s.renewalPill}>
+                  <Text style={s.small}>
+                    Access through{" "}
+                    {new Date(data.periodEnd).toLocaleDateString()}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <Text style={s.billingSectionTitle}>Usage</Text>
+            <View style={s.usageGrid}>
+              <UsageCard
+                label="Cloud notes"
+                value={data.notes}
+                limit={data.plan === "pro" ? null : 100}
+              />
+              <UsageCard
+                label="Share links"
+                value={data.shares}
+                limit={data.plan === "pro" ? null : 3}
+              />
+              <UsageCard
+                label="Devices"
+                value={data.devices?.length ?? 0}
+                limit={data.plan === "pro" ? 5 : 2}
+              />
+            </View>
+            <Text style={s.billingSectionTitle}>
+              {data.plan === "pro" ? "Included with Pro" : "Upgrade to Pro"}
             </Text>
-          )}
-        </View>
-        <Button onPress={openBilling}>
-          {data?.plan === "pro" ? "Manage Pro subscription" : "Upgrade to Pro"}
-        </Button>
-        <Text style={s.small}>
-          Billing opens the secure EchoNotes web checkout. Payment secrets never
-          enter this app.
-        </Text>
-      </View>
+            <View style={s.featureCard}>
+              <PlanFeature
+                text={
+                  data.plan === "pro"
+                    ? "Unlimited cloud-synced notes"
+                    : "Unlimited cloud-synced notes on Pro"
+                }
+              />
+              <PlanFeature
+                text={
+                  data.plan === "pro"
+                    ? "Unlimited public share links"
+                    : "Unlimited public share links on Pro"
+                }
+              />
+              <PlanFeature text="Offline editor, folders, tags and PDF export" />
+              <PlanFeature
+                text={
+                  data.plan === "pro"
+                    ? "Sync up to 5 devices"
+                    : "Sync up to 5 devices on Pro"
+                }
+              />
+            </View>
+            <Button onPress={openBilling}>
+              {data.plan === "pro"
+                ? "Manage Pro subscription"
+                : "View Pro plans"}
+            </Button>
+            <Text style={s.billingNote}>
+              Checkout and subscription management open on the secure EchoNotes
+              website.
+            </Text>
+          </>
+        )}
+      </ScrollView>
     </SafeAreaView>
+  );
+}
+function UsageCard({ label, value, limit }) {
+  const progress = limit ? Math.min(1, value / limit) : 1;
+  return (
+    <View style={s.usageCard}>
+      <Text style={s.usageValue}>
+        {value}
+        {limit ? ` / ${limit}` : ""}
+      </Text>
+      <Text style={s.small}>{label}</Text>
+      <View style={s.usageTrack}>
+        <View style={[s.usageFill, { width: `${progress * 100}%` }]} />
+      </View>
+    </View>
+  );
+}
+function PlanFeature({ text }) {
+  return (
+    <View style={s.featureRow}>
+      <View style={s.featureCheck}>
+        <Check size={14} color={colors.success} />
+      </View>
+      <Text style={s.featureText}>{text}</Text>
+    </View>
   );
 }
 function Devices({ navigation }) {
@@ -1159,21 +1415,13 @@ function Tabs() {
     </Tab.Navigator>
   );
 }
-export default function App() {
+function AppContent() {
+  const { navigationTheme, statusBarStyle } = useAppTheme();
+  s = createStyles();
   const ready = useAuthStore((x) => x.ready);
   const session = useAuthStore((x) => x.session);
   const pending = useAuthStore((x) => x.pendingMerge);
   const merge = useAuthStore((x) => x.mergeGuest);
-  const selectedTheme = usePreferences((x) => x.theme);
-  const systemTheme = useColorScheme();
-  const [activeTheme, setActiveTheme] = useState("dark");
-  useEffect(() => {
-    const resolved =
-      selectedTheme === "system" ? (systemTheme ?? "dark") : selectedTheme;
-    applyTheme(resolved);
-    s = createStyles();
-    setActiveTheme(resolved);
-  }, [selectedTheme, systemTheme]);
   useEffect(() => {
     let auth;
     void usePreferences.getState().initialize();
@@ -1189,12 +1437,21 @@ export default function App() {
     void useNotesStore.getState().load(id);
     void useAlerts.getState().load(id);
     let stop;
-    if (session)
-      registerDevice().then((result) => {
-        if (result.error)
-          Alert.alert("This device cannot sync", result.error.message);
-        else stop = startAutoSync(session.user.id);
-      });
+    if (session) {
+      stop = startAutoSync(session.user.id);
+      registerDevice()
+        .then((result) => {
+          if (result.error?.message?.includes("DEVICE_LIMIT_REACHED")) {
+            stop?.();
+            useNotesStore.getState().setSync("error");
+            Alert.alert(
+              "Device limit reached",
+              "Remove an old device from Settings before syncing this phone.",
+            );
+          }
+        })
+        .catch(() => {});
+    }
     return () => stop?.();
   }, [ready, session?.user?.id]);
   useEffect(() => {
@@ -1216,8 +1473,8 @@ export default function App() {
     );
   return (
     <SafeAreaProvider>
-      <StatusBar style={activeTheme === "light" ? "dark" : "light"} />
-      <NavigationContainer theme={navigationTheme()}>
+      <StatusBar style={statusBarStyle} />
+      <NavigationContainer theme={navigationTheme}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Home" component={Tabs} />
           <Stack.Screen name="Editor" component={Editor} />
@@ -1236,6 +1493,14 @@ export default function App() {
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }
 
@@ -1285,6 +1550,18 @@ const createStyles = () =>
     small: { color: colors.muted, fontSize: 12, lineHeight: 18 },
     value: { color: colors.text, fontWeight: "600" },
     error: { color: colors.danger, marginTop: 10 },
+    successBox: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+      marginTop: 12,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.success + "66",
+      backgroundColor: colors.success + "12",
+    },
+    successText: { color: colors.success, flex: 1, fontWeight: "600" },
     link: { color: colors.primary, textAlign: "center", marginTop: 18 },
     input: {
       minHeight: 52,
@@ -1397,6 +1674,125 @@ const createStyles = () =>
     },
     cardTitle: { color: colors.text, fontSize: 16, fontWeight: "700" },
     flexRow: { flex: 1, flexDirection: "row", alignItems: "center", gap: 13 },
+    settingsHeader: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
+    settingsSubtitle: { color: colors.muted, fontSize: 13, marginTop: 4 },
+    settingsContent: { padding: 16, paddingBottom: 110 },
+    accountCard: {
+      minHeight: 78,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 13,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 18,
+      padding: 14,
+    },
+    accountAvatar: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.primarySoft,
+    },
+    accountName: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: "800",
+      marginBottom: 3,
+    },
+    planCard: {
+      marginTop: 12,
+      borderRadius: 18,
+      padding: 17,
+      backgroundColor: colors.primarySoft,
+      borderWidth: 1,
+      borderColor: colors.primary + "55",
+    },
+    planTop: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+    },
+    planEyebrow: {
+      color: colors.primary,
+      fontSize: 10,
+      fontWeight: "900",
+      letterSpacing: 1.2,
+    },
+    planName: {
+      color: colors.text,
+      fontSize: 20,
+      fontWeight: "900",
+      marginTop: 4,
+    },
+    planBadge: {
+      backgroundColor: colors.primary,
+      borderRadius: 20,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    planBadgeText: {
+      color: "white",
+      fontSize: 10,
+      fontWeight: "900",
+      letterSpacing: 0.8,
+    },
+    planDescription: {
+      color: colors.muted,
+      fontSize: 12,
+      lineHeight: 18,
+      marginTop: 12,
+    },
+    planFooter: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      borderTopWidth: 1,
+      borderTopColor: colors.primary + "33",
+      paddingTop: 12,
+      marginTop: 13,
+    },
+    planAction: { color: colors.primary, fontSize: 13, fontWeight: "800" },
+    sectionLabel: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 7,
+      marginTop: 24,
+      marginBottom: 8,
+      paddingHorizontal: 3,
+    },
+    sectionLabelText: {
+      color: colors.muted,
+      fontSize: 11,
+      fontWeight: "800",
+      letterSpacing: 0.9,
+      textTransform: "uppercase",
+    },
+    settingsGroup: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 17,
+      paddingHorizontal: 14,
+      overflow: "hidden",
+    },
+    settingLeading: { flexDirection: "row", alignItems: "center", gap: 11 },
+    settingIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      backgroundColor: colors.primarySoft,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    settingsVersion: {
+      color: colors.muted,
+      fontSize: 11,
+      textAlign: "center",
+      marginTop: 20,
+    },
     setting: {
       minHeight: 58,
       flexDirection: "row",
@@ -1404,6 +1800,117 @@ const createStyles = () =>
       justifyContent: "space-between",
       borderBottomWidth: 1,
       borderColor: colors.border,
+    },
+    selectValue: { flexDirection: "row", alignItems: "center", gap: 7 },
+    selectSheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: 22,
+      borderTopRightRadius: 22,
+      padding: 18,
+      paddingBottom: 38,
+    },
+    selectTitle: {
+      color: colors.text,
+      fontSize: 19,
+      fontWeight: "800",
+      marginBottom: 10,
+    },
+    selectOption: {
+      minHeight: 52,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 12,
+      borderRadius: 12,
+    },
+    selectedOption: { backgroundColor: colors.primarySoft },
+    billingContent: { padding: 18, paddingBottom: 90 },
+    billingHero: {
+      alignItems: "center",
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 22,
+      padding: 24,
+    },
+    billingIcon: {
+      width: 52,
+      height: 52,
+      borderRadius: 18,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.primarySoft,
+      marginBottom: 15,
+    },
+    billingPlan: {
+      color: colors.text,
+      fontSize: 28,
+      fontWeight: "900",
+      marginTop: 5,
+    },
+    billingLead: {
+      color: colors.muted,
+      fontSize: 13,
+      textAlign: "center",
+      lineHeight: 20,
+      marginTop: 8,
+    },
+    renewalPill: {
+      backgroundColor: colors.raised,
+      borderRadius: 18,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      marginTop: 14,
+    },
+    billingSectionTitle: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: "800",
+      marginTop: 24,
+      marginBottom: 10,
+    },
+    usageGrid: { flexDirection: "row", gap: 8 },
+    usageCard: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 15,
+      padding: 12,
+    },
+    usageValue: { color: colors.text, fontSize: 17, fontWeight: "900" },
+    usageTrack: {
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.raised,
+      marginTop: 10,
+      overflow: "hidden",
+    },
+    usageFill: { height: 4, borderRadius: 2, backgroundColor: colors.primary },
+    featureCard: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 17,
+      padding: 15,
+      gap: 13,
+    },
+    featureRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+    featureCheck: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.success + "18",
+    },
+    featureText: { color: colors.text, fontSize: 13, flex: 1, lineHeight: 19 },
+    billingNote: {
+      color: colors.muted,
+      fontSize: 11,
+      textAlign: "center",
+      lineHeight: 17,
+      marginTop: 12,
     },
     tabs: {
       flexGrow: 0,

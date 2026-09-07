@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
-import { colors } from "../theme";
+import { useAppTheme } from "../theme/ThemeProvider";
 const inline = (value, key, s) => {
   const parts = value.split(/(\*\*.+?\*\*|~~.+?~~|`.+?`|\*.+?\*)/g);
   return parts.map((p, i) => {
@@ -31,7 +31,8 @@ const inline = (value, key, s) => {
   });
 };
 export function MarkdownPreview({ content, fontSize = 16 }) {
-  const s = createStyles();
+  const { colors } = useAppTheme();
+  const s = createStyles(colors);
   let inCode = false;
   return (
     <View>
@@ -85,7 +86,7 @@ export function MarkdownPreview({ content, fontSize = 16 }) {
     </View>
   );
 }
-const createStyles = () =>
+const createStyles = (colors) =>
   StyleSheet.create({
     line: { color: colors.text, lineHeight: 25, marginBottom: 4 },
     heading: {
