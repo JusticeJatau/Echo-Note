@@ -12,6 +12,10 @@
       "resizeMode": "contain",
       "backgroundColor": "#090b10"
     },
+    "androidStatusBar": {
+      "backgroundColor": "#090b10",
+      "barStyle": "light-content"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.echo8v.echonotes"
@@ -21,7 +25,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#090b10"
       },
-      "edgeToEdgeEnabled": true,
+      "edgeToEdgeEnabled": false,
       "package": "com.echo8v.echonotes"
     },
     "web": {

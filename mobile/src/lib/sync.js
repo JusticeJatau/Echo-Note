@@ -12,6 +12,7 @@ import {
   saveLocalNote,
 } from "../db/database";
 import { useNotesStore } from "../store/notes";
+import { useAlerts } from "../store/alerts";
 
 let active = null;
 const notePayload = (note, userId) => ({
@@ -46,7 +47,8 @@ export async function syncNow(userId) {
     }
     useNotesStore.getState().setSync("syncing");
     try {
-      for (const op of await listOperations(userId)) {
+      const operations = await listOperations(userId);
+      for (const op of operations) {
         const table = op.entity_type === "note" ? "notes" : "folders";
         let result;
         if (op.operation === "delete")
@@ -123,9 +125,25 @@ export async function syncNow(userId) {
         [...folders.values()],
       );
       useNotesStore.getState().setSync("synced", stamp);
+      if (operations.length)
+        await useAlerts
+          .getState()
+          .add(
+            "success",
+            "Notes synced",
+            `${operations.length} pending change${operations.length === 1 ? "" : "s"} synced successfully.`,
+          );
       return { ok: true };
     } catch (error) {
       useNotesStore.getState().setSync("error");
+      await useAlerts
+        .getState()
+        .add(
+          "error",
+          "Sync needs attention",
+          error?.message ??
+            "Your notes remain safe offline and will retry automatically.",
+        );
       return { ok: false, error };
     } finally {
       active = null;

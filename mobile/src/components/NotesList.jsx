@@ -1,7 +1,13 @@
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { FileText, Star } from "lucide-react-native";
+import { Check, FileText, Star } from "lucide-react-native";
 import { useAppTheme } from "../theme/ThemeProvider";
-export function NotesList({ notes, empty = "No notes yet", onOpen }) {
+export function NotesList({
+  notes,
+  empty = "No notes yet",
+  onOpen,
+  selectedIds = [],
+  onToggleSelection,
+}) {
   const { colors } = useAppTheme();
   const styles = createStyles(colors);
   return (
@@ -15,24 +21,46 @@ export function NotesList({ notes, empty = "No notes yet", onOpen }) {
           <Text style={styles.emptyText}>{empty}</Text>
         </View>
       }
-      renderItem={({ item }) => (
-        <Pressable onPress={() => onOpen?.(item)} style={styles.card}>
-          <View style={{ flex: 1 }}>
-            <Text numberOfLines={1} style={styles.title}>
-              {item.title || "Untitled Note"}
-            </Text>
-            <Text numberOfLines={2} style={styles.preview}>
-              {item.content || "Start writing…"}
-            </Text>
-            <Text style={styles.date}>
-              {new Date(item.updated_at).toLocaleDateString()}
-            </Text>
-          </View>
-          {item.is_favorite && (
-            <Star size={16} color={colors.warning} fill={colors.warning} />
-          )}
-        </Pressable>
-      )}
+      renderItem={({ item }) => {
+        const selected = selectedIds.includes(item.id);
+        const selecting = selectedIds.length > 0;
+        return (
+          <Pressable
+            onLongPress={() => !item.is_system && onToggleSelection?.(item)}
+            onPress={() =>
+              selecting && !item.is_system
+                ? onToggleSelection?.(item)
+                : onOpen?.(item)
+            }
+            style={[styles.card, selected && styles.selectedCard]}
+          >
+            {selecting && (
+              <View
+                style={[
+                  styles.selectionCircle,
+                  selected && styles.selectionCircleActive,
+                ]}
+              >
+                {selected && <Check size={13} color="white" />}
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text numberOfLines={1} style={styles.title}>
+                {item.title || "Untitled Note"}
+              </Text>
+              <Text numberOfLines={2} style={styles.preview}>
+                {item.content || "Start writing…"}
+              </Text>
+              <Text style={styles.date}>
+                {new Date(item.updated_at).toLocaleDateString()}
+              </Text>
+            </View>
+            {item.is_favorite && (
+              <Star size={16} color={colors.warning} fill={colors.warning} />
+            )}
+          </Pressable>
+        );
+      }}
     />
   );
 }
@@ -49,6 +77,24 @@ const createStyles = (colors) =>
       backgroundColor: colors.surface,
       borderRadius: 15,
       padding: 16,
+    },
+    selectedCard: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primarySoft,
+    },
+    selectionCircle: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 1.5,
+      borderColor: colors.muted,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 1,
+    },
+    selectionCircleActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
     },
     title: { color: colors.text, fontWeight: "700", fontSize: 16 },
     preview: {

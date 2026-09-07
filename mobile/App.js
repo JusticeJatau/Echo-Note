@@ -64,6 +64,7 @@ import { usePreferences } from "./src/store/preferences";
 import { useAlerts } from "./src/store/alerts";
 import { NotesList } from "./src/components/NotesList";
 import { MarkdownPreview } from "./src/components/MarkdownPreview";
+import { LiveLineEditor } from "./src/components/LiveLineEditor";
 import { colors } from "./src/theme";
 import { ThemeProvider, useAppTheme } from "./src/theme/ThemeProvider";
 import { startAutoSync, syncNow } from "./src/lib/sync";
@@ -78,6 +79,11 @@ import { supabase } from "./src/lib/supabase";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+function useScreenTheme() {
+  const theme = useAppTheme();
+  s = createStyles();
+  return theme;
+}
 const owner = () => useAuthStore.getState().session?.user?.id ?? "guest";
 
 function Header({ title, back, navigation, right }) {
@@ -122,6 +128,7 @@ function Button({ children, onPress, kind = "primary", disabled = false }) {
   );
 }
 function Login({ navigation }) {
+  useScreenTheme();
   const signIn = useAuthStore((x) => x.signIn);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -194,6 +201,7 @@ function Login({ navigation }) {
   );
 }
 function Signup({ navigation }) {
+  useScreenTheme();
   const signUp = useAuthStore((x) => x.signUp);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -238,6 +246,7 @@ function Signup({ navigation }) {
   );
 }
 function ForgotPassword({ navigation }) {
+  useScreenTheme();
   const reset = useAuthStore((x) => x.resetPassword);
   const [email, setEmail] = useState("");
   const [msg, setMsg] = useState("");
@@ -270,9 +279,17 @@ function ForgotPassword({ navigation }) {
 }
 
 function NoteScreen({ navigation, route }) {
+  useScreenTheme();
   const notes = useNotesStore((x) => x.notes);
   const create = useNotesStore((x) => x.create);
+  const trashNote = useNotesStore((x) => x.trash);
+  const restoreNote = useNotesStore((x) => x.restore);
+  const permanentDelete = useNotesStore((x) => x.permanentDelete);
+  const unread = useAlerts(
+    (x) => x.alerts.filter((alert) => !alert.read).length,
+  );
   const [query, setQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState([]);
   const filter = route?.params?.filter ?? "notes";
   let shown = searchNotes(notes, query).filter((n) =>
     filter === "trash"
@@ -285,22 +302,85 @@ function NoteScreen({ navigation, route }) {
     const n = await create();
     navigation.navigate("Editor", { id: n.id });
   }
+  const toggleSelection = (note) =>
+    setSelectedIds((ids) =>
+      ids.includes(note.id)
+        ? ids.filter((id) => id !== note.id)
+        : [...ids, note.id],
+    );
+  const applySelection = async (action) => {
+    for (const id of selectedIds) await action(id);
+    setSelectedIds([]);
+  };
   return (
     <SafeAreaView style={s.page}>
       <View style={s.titleRow}>
-        <Text style={s.pageTitle}>
-          {filter === "trash"
-            ? "Trash"
-            : filter === "favorites"
-              ? "Favorites"
-              : "Notes"}
-        </Text>
-        <Pressable
-          style={s.notificationButton}
-          onPress={() => navigation.navigate("Alerts")}
-        >
-          <Bell color={colors.muted} />
-        </Pressable>
+        {selectedIds.length ? (
+          <View style={s.selectionHeader}>
+            <Pressable style={s.icon} onPress={() => setSelectedIds([])}>
+              <X color={colors.text} />
+            </Pressable>
+            <Text style={s.selectionCount}>{selectedIds.length} selected</Text>
+          </View>
+        ) : (
+          <Text style={s.pageTitle}>
+            {filter === "trash"
+              ? "Trash"
+              : filter === "favorites"
+                ? "Favorites"
+                : "Notes"}
+          </Text>
+        )}
+        {selectedIds.length ? (
+          <View style={s.selectionActions}>
+            {filter === "trash" && (
+              <Pressable
+                style={s.icon}
+                onPress={() => applySelection(restoreNote)}
+              >
+                <RotateCcw color={colors.primary} />
+              </Pressable>
+            )}
+            <Pressable
+              style={s.icon}
+              onPress={() =>
+                Alert.alert(
+                  filter === "trash"
+                    ? "Delete permanently?"
+                    : "Move notes to trash?",
+                  `${selectedIds.length} note${selectedIds.length === 1 ? "" : "s"} selected.`,
+                  [
+                    { text: "Cancel" },
+                    {
+                      text: filter === "trash" ? "Delete" : "Move",
+                      style: "destructive",
+                      onPress: () =>
+                        applySelection(
+                          filter === "trash" ? permanentDelete : trashNote,
+                        ),
+                    },
+                  ],
+                )
+              }
+            >
+              <Trash2 color={colors.danger} />
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            style={s.notificationButton}
+            onPress={() => navigation.navigate("Alerts")}
+          >
+            <Bell color={colors.muted} />
+            {unread > 0 && (
+              <View style={s.notificationBadge}>
+                <Text style={s.notificationBadgeText}>
+                  {unread > 9 ? "9+" : unread}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        )}
       </View>
       <View style={s.search}>
         <Search size={18} color={colors.muted} />
@@ -316,6 +396,8 @@ function NoteScreen({ navigation, route }) {
         notes={shown}
         empty={`No ${filter} yet`}
         onOpen={(n) => navigation.navigate("Editor", { id: n.id })}
+        selectedIds={selectedIds}
+        onToggleSelection={toggleSelection}
       />
       {filter === "notes" && (
         <Pressable onPress={add} style={s.fab}>
@@ -332,6 +414,7 @@ const Trash = (p) => (
   <NoteScreen {...p} route={{ params: { filter: "trash" } }} />
 );
 function Folders({ navigation }) {
+  useScreenTheme();
   const folders = useNotesStore((x) => x.folders);
   const notes = useNotesStore((x) => x.notes);
   const create = useNotesStore((x) => x.createFolder);
@@ -399,6 +482,7 @@ function Folders({ navigation }) {
   );
 }
 function FolderNotes({ route, navigation }) {
+  useScreenTheme();
   const notes = useNotesStore((x) => x.notes).filter(
     (n) => n.folder_id === route.params.id && !n.is_deleted,
   );
@@ -433,6 +517,7 @@ const FORMAT = [
   { label: "Code", before: "```js\n", after: "\n```", Icon: Code },
 ];
 function Editor({ route, navigation }) {
+  useScreenTheme();
   const notes = useNotesStore((x) => x.notes);
   const folders = useNotesStore((x) => x.folders);
   const note = notes.find((n) => n.id === route.params.id);
@@ -445,16 +530,12 @@ function Editor({ route, navigation }) {
   const [content, setContent] = useState(note?.content ?? "");
   const [tagText, setTagText] = useState((note?.tags ?? []).join(", "));
   const [selection, setSelection] = useState({ start: 0, end: 0 });
-  const [preview, setPreview] = useState(
-    note?.is_system || prefs.editorMode === "live-preview",
-  );
   const [more, setMore] = useState(false);
   const timer = useRef();
   useEffect(() => {
     setTitle(note?.title ?? "");
     setContent(note?.content ?? "");
     setTagText((note?.tags ?? []).join(", "));
-    setPreview(note?.is_system || prefs.editorMode === "live-preview");
   }, [route.params.id]);
   useEffect(() => () => clearTimeout(timer.current), []);
   if (!note)
@@ -498,21 +579,14 @@ function Editor({ route, navigation }) {
         navigation={navigation}
         title=""
         right={
-          <View style={s.flexRow}>
-            <Pressable style={s.icon} onPress={() => setPreview(!preview)}>
-              {preview ? (
-                <FileCode2 color={colors.primary} />
-              ) : (
-                <Eye color={colors.muted} />
-              )}
-            </Pressable>
+          <View style={s.editorActions}>
             <Pressable style={s.icon} onPress={() => setMore(true)}>
               <MoreHorizontal color={colors.text} />
             </Pressable>
           </View>
         }
       />
-      {!note.is_system && !preview && (
+      {!note.is_system && (
         <ScrollView
           horizontal
           keyboardShouldPersistTaps="always"
@@ -579,8 +653,16 @@ function Editor({ route, navigation }) {
             </ScrollView>
           </>
         )}
-        {preview ? (
+        {note.is_system ? (
           <MarkdownPreview content={content} fontSize={prefs.editorFontSize} />
+        ) : prefs.editorMode === "live-preview" ? (
+          <LiveLineEditor
+            content={content}
+            onChangeText={changeContent}
+            onSelectionChange={setSelection}
+            fontSize={prefs.editorFontSize}
+            spellCheck={prefs.spellCheck}
+          />
         ) : (
           <TextInput
             multiline
@@ -654,6 +736,7 @@ function Editor({ route, navigation }) {
 }
 
 function ExportScreen({ route, navigation }) {
+  useScreenTheme();
   const note = useNotesStore((x) =>
     x.notes.find((n) => n.id === route.params.id),
   );
@@ -673,6 +756,7 @@ function ExportScreen({ route, navigation }) {
   );
 }
 function ShareScreen({ route, navigation }) {
+  useScreenTheme();
   const user = useAuthStore((x) => x.session?.user);
   const note = useNotesStore((x) =>
     x.notes.find((n) => n.id === route.params.id),
@@ -728,6 +812,7 @@ function ShareScreen({ route, navigation }) {
 }
 
 function SettingsScreen({ navigation }) {
+  useScreenTheme();
   const session = useAuthStore((x) => x.session);
   const signOut = useAuthStore((x) => x.signOut);
   const p = usePreferences();
@@ -1039,6 +1124,7 @@ function SelectRow({ label, value, options, onChange }) {
   );
 }
 function Profile({ navigation }) {
+  useScreenTheme();
   const user = useAuthStore((x) => x.session?.user);
   const [name, setName] = useState(user?.user_metadata?.full_name ?? "");
   return (
@@ -1071,6 +1157,7 @@ function Profile({ navigation }) {
   );
 }
 function Billing({ navigation }) {
+  useScreenTheme();
   const user = useAuthStore((x) => x.session?.user);
   const [data, setData] = useState();
   useEffect(() => {
@@ -1197,6 +1284,7 @@ function PlanFeature({ text }) {
   );
 }
 function Devices({ navigation }) {
+  useScreenTheme();
   const user = useAuthStore((x) => x.session?.user);
   const [data, setData] = useState();
   const load = async () => {
@@ -1237,6 +1325,7 @@ function Devices({ navigation }) {
   );
 }
 function Alerts({ navigation }) {
+  useScreenTheme();
   const alerts = useAlerts((x) => x.alerts);
   const mark = useAlerts((x) => x.mark);
   const remove = useAlerts((x) => x.remove);
@@ -1272,6 +1361,7 @@ function Alerts({ navigation }) {
   );
 }
 function Help({ navigation }) {
+  useScreenTheme();
   return (
     <SafeAreaView style={s.page}>
       <Header title="Help" back navigation={navigation} />
@@ -1303,6 +1393,7 @@ function Help({ navigation }) {
   );
 }
 function Feedback({ route, navigation }) {
+  useScreenTheme();
   const user = useAuthStore((x) => x.session?.user);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -1365,15 +1456,16 @@ function Feedback({ route, navigation }) {
 }
 
 function Tabs() {
+  const { colors: themeColors } = useScreenTheme();
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.muted,
+        tabBarActiveTintColor: themeColors.primary,
+        tabBarInactiveTintColor: themeColors.muted,
         tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
+          backgroundColor: themeColors.surface,
+          borderTopColor: themeColors.border,
           height: 68,
           paddingTop: 6,
         },
@@ -1434,12 +1526,15 @@ function AppContent() {
   useEffect(() => {
     if (!ready) return;
     const id = session?.user?.id ?? "guest";
-    void useNotesStore.getState().load(id);
-    void useAlerts.getState().load(id);
+    let cancelled = false;
     let stop;
-    if (session) {
+    void Promise.all([
+      useNotesStore.getState().load(id),
+      useAlerts.getState().load(id),
+    ]).then(() => {
+      if (cancelled || !session) return;
       stop = startAutoSync(session.user.id);
-      registerDevice()
+      void registerDevice()
         .then((result) => {
           if (result.error?.message?.includes("DEVICE_LIMIT_REACHED")) {
             stop?.();
@@ -1451,8 +1546,11 @@ function AppContent() {
           }
         })
         .catch(() => {});
-    }
-    return () => stop?.();
+    });
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
   }, [ready, session?.user?.id]);
   useEffect(() => {
     if (pending)
@@ -1473,7 +1571,11 @@ function AppContent() {
     );
   return (
     <SafeAreaProvider>
-      <StatusBar style={statusBarStyle} />
+      <StatusBar
+        style={statusBarStyle}
+        backgroundColor={colors.background}
+        translucent={false}
+      />
       <NavigationContainer theme={navigationTheme}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Home" component={Tabs} />
@@ -1606,6 +1708,33 @@ const createStyles = () =>
       alignItems: "center",
       justifyContent: "center",
       marginRight: -8,
+    },
+    notificationBadge: {
+      position: "absolute",
+      right: 3,
+      top: 3,
+      minWidth: 17,
+      height: 17,
+      borderRadius: 9,
+      backgroundColor: colors.danger,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 3,
+      borderWidth: 2,
+      borderColor: colors.background,
+    },
+    notificationBadgeText: { color: "white", fontSize: 9, fontWeight: "900" },
+    selectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginLeft: -10,
+    },
+    selectionCount: { color: colors.text, fontSize: 18, fontWeight: "800" },
+    selectionActions: { flexDirection: "row", alignItems: "center" },
+    editorActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "flex-end",
     },
     eyebrow: {
       color: colors.primary,

@@ -13,13 +13,14 @@
 | Permanent deletion       | Queued Supabase delete after local deletion                                          |
 | Welcome note             | Fixed read-only first note for every workspace                                       |
 | Mobile navigation        | Focused single-note editor without desktop-style note tabs                           |
-| Markdown                 | Source/preview switch, selection toolbar and formatted code blocks                   |
+| Markdown                 | Line-based Live Preview, Source mode, selection toolbar and formatted code blocks    |
 | Exports/imports          | PDF, Markdown, text, document import and native share sheet                          |
 | Public links             | Supabase read-only note share records and copyable web URL                           |
 | Settings                 | Editor mode/size, spellcheck, autosave persistence and logout retention              |
 | Theme                    | Functional Dark, Light and System appearance modes                                   |
 | Account tools            | Login, signup, reset email, profile and signout                                      |
-| Alerts/help/feedback     | Local alerts plus Supabase bug/feature submissions                                   |
+| Alerts/help/feedback     | Durable sync alerts, unread badge and Supabase bug/feature submissions               |
+| Bulk note actions        | Long-press selection, multi-select trash, restore and permanent delete               |
 | Basic/Pro limits         | Subscription overview and server-enforced 2/5-device registration                    |
 | Paystack                 | Secure handoff to the deployed web billing page; no payment secret in mobile         |
 
