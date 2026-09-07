@@ -27,6 +27,7 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-secure-store", "expo-sqlite"]
+    "scheme": "echonotes",
+    "plugins": ["expo-secure-store", "expo-sqlite", "expo-document-picker"]
   }
 }

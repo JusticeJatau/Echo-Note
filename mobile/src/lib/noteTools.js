@@ -1,0 +1,14 @@
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
+
+export const normalizeTags=(tags=[])=>[...new Set(tags.map(t=>String(t).trim().replace(/^#/,"").toLowerCase()).filter(Boolean))].slice(0,12);
+export const safeFilename=(title="Untitled Note")=>title.replace(/[\\/:*?"<>|]/g,"-").replace(/\s+/g," ").trim()||"Untitled Note";
+export const noteAsMarkdown=(n)=>`${n.tags?.length?`---\ntags: [${normalizeTags(n.tags).join(", ")}]\n---\n\n`:""}# ${n.title||"Untitled Note"}\n\n${n.content||""}`;
+export function parseImportedNote(filename,text){const fallback=filename.replace(/\.(md|markdown|txt)$/i,"")||"Imported Note";const tag=text.match(/^---\s*\n[\s\S]*?tags:\s*\[([^\]]*)\][\s\S]*?\n---\s*\n?/i);const body=tag?text.slice(tag[0].length):text;const heading=body.match(/^#\s+(.+)$/m);return{title:heading?.[1]?.trim()||fallback,content:heading?.index===0?body.slice(heading[0].length).replace(/^\s*\n/,""):body,tags:normalizeTags(tag?.[1]?.split(",")??[])}}
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+export function markdownHtml(content=""){let code=false;return content.split("\n").map(line=>{if(line.startsWith("```")){code=!code;return code?"<pre><code>":"</code></pre>"}if(code)return `${esc(line)}\n`;let x=esc(line).replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/~~(.+?)~~/g,"<del>$1</del>").replace(/`(.+?)`/g,"<code>$1</code>").replace(/\*(.+?)\*/g,"<em>$1</em>");const h=x.match(/^(#{1,3})\s+(.+)/);if(h)return`<h${h[1].length}>${h[2]}</h${h[1].length}>`;if(x.startsWith("> "))return`<blockquote>${x.slice(2)}</blockquote>`;if(/^[-*+] /.test(x))return`<p>• ${x.slice(2)}</p>`;return x?`<p>${x}</p>`:"<br>"}).join("")}
+export async function exportPdf(note){const{uri}=await Print.printToFileAsync({html:`<html><style>body{font:16px/1.7 Arial;padding:24px;color:#17151c}h1{font-size:30px}pre{background:#f1eff5;padding:14px;border-radius:8px}code{font-family:monospace}blockquote{border-left:3px solid #7137d8;padding-left:12px}</style><body><h1>${esc(note.title)}</h1>${markdownHtml(note.content)}</body></html>`});await Sharing.shareAsync(uri,{mimeType:"application/pdf",dialogTitle:"Export PDF"})}
+export async function exportText(note,format="md"){const name=`${safeFilename(note.title)}.${format}`;const uri=FileSystem.cacheDirectory+name;await FileSystem.writeAsStringAsync(uri,format==="md"?noteAsMarkdown(note):note.content);await Sharing.shareAsync(uri,{dialogTitle:"Export note"})}
+export async function pickNotes(){const result=await DocumentPicker.getDocumentAsync({type:["text/plain","text/markdown","application/octet-stream"],multiple:true,copyToCacheDirectory:true});if(result.canceled)return[];const output=[];for(const asset of result.assets){output.push(parseImportedNote(asset.name,await FileSystem.readAsStringAsync(asset.uri)))}return output}
