@@ -152,7 +152,7 @@ export async function processPaystackEvent(event) {
   }
 
   const { error } = await supabaseAdmin.from("billing_events").insert({ event_key: eventKey, event_type: event.event, payload: event });
-  if (error?.code !== "23505") throw error;
+  if (error && error.code !== "23505") throw error;
 }
 
 export async function verifyPaystackSignature(rawBody, signature) {
