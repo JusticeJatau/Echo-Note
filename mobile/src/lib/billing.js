@@ -16,8 +16,10 @@ async function billingRequest(payload){
   const{data:{session},error}=await supabase.auth.getSession();
   if(error||!session?.access_token)throw new Error("Sign in again before opening billing.");
   const response=await fetch(`${APP_URL}/api/mobile/billing`,{method:"POST",headers:{Authorization:`Bearer ${session.access_token}`,"Content-Type":"application/json"},body:JSON.stringify(payload)});
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(data.error??`Billing request failed (${response.status}).`);
+  const raw=await response.text();
+  let data={};
+  try{data=raw?JSON.parse(raw):{}}catch{}
+  if(!response.ok)throw new Error(data.error??data.message??(raw&&!raw.startsWith("<")?raw:`Billing request failed (${response.status} ${response.statusText}).`));
   return data;
 }
 export async function startCheckout(interval){

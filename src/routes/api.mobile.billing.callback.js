@@ -7,7 +7,7 @@ export const Route = createFileRoute("/api/mobile/billing/callback")({
         const url = new URL(request.url);
         const reference = url.searchParams.get("reference") ?? "";
         const requestedReturn = url.searchParams.get("return_to") ?? "";
-        const returnUrl = /^(echonotes|exp|exps):\/\//.test(requestedReturn)
+        const returnUrl = /^(echonotes|exp|exps|exp\+echonotes):\/\//.test(requestedReturn)
           ? new URL(requestedReturn)
           : new URL("echonotes://billing/callback");
         returnUrl.searchParams.set("reference", reference);

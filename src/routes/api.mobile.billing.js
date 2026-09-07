@@ -13,7 +13,7 @@ export const Route = createFileRoute("/api/mobile/billing")({
           if (body.action === "checkout") {
             if (!['monthly', 'annually'].includes(body.interval)) return jsonResponse({ error: "Choose monthly or annually." }, 400);
             const returnUrl = typeof body.returnUrl === "string" ? body.returnUrl : "";
-            if (!/^(echonotes|exp|exps):\/\//.test(returnUrl)) return jsonResponse({ error: "Invalid mobile return URL." }, 400);
+            if (!/^(echonotes|exp|exps|exp\+echonotes):\/\//.test(returnUrl)) return jsonResponse({ error: "Invalid mobile return URL." }, 400);
             const origin = process.env["APP_URL"] || new URL(request.url).origin;
             const callbackUrl = `${origin}/api/mobile/billing/callback?return_to=${encodeURIComponent(returnUrl)}`;
             return jsonResponse(await initializePaystackCheckout({

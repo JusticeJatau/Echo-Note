@@ -661,6 +661,7 @@ function Editor({ route, navigation }) {
         ) : prefs.editorMode === "live-preview" ? (
           <LiveLineEditor
             content={content}
+            selection={selection}
             onChangeText={changeContent}
             onSelectionChange={setSelection}
             fontSize={prefs.editorFontSize}
@@ -1212,9 +1213,11 @@ function Billing({ navigation }) {
   const user = useAuthStore((x) => x.session?.user);
   const [data, setData] = useState();
   const [busy, setBusy] = useState(false);
+  const [planPicker, setPlanPicker] = useState(false);
+  const [billingNotice, setBillingNotice] = useState(null);
   const refreshBilling = () => billingOverview(user.id)
       .then(setData)
-      .catch((e) => Alert.alert("Billing", e.message));
+      .catch((e) => setBillingNotice({ title: "Billing unavailable", message: e.message }));
   useEffect(() => { refreshBilling(); }, [user.id]);
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
@@ -1228,19 +1231,15 @@ function Billing({ navigation }) {
       const result = action === "manage" ? await manageSubscription() : await startCheckout(action);
       if (result?.cancelled) return;
       await refreshBilling();
-      if (action !== "manage") Alert.alert("Payment confirmed", "EchoNotes Pro is now active on your account.");
+      if (action !== "manage") setBillingNotice({ title: "Payment confirmed", message: "EchoNotes Pro is now active on your account." });
     } catch (error) {
-      Alert.alert("Billing", error?.message ?? "Could not open billing.");
+      setBillingNotice({ title: "Could not open billing", message: error?.message ?? "Please try again." });
     } finally {
       setBusy(false);
     }
   }
   function openPlanChoice() {
-    Alert.alert("Upgrade to EchoNotes Pro", "Choose your billing interval.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Monthly · ₦1,500", onPress: () => void runBilling("monthly") },
-      { text: "Annual · ₦15,000", onPress: () => void runBilling("annually") },
-    ]);
+    setPlanPicker(true);
   }
   return (
     <SafeAreaView style={s.page}>
@@ -1331,6 +1330,34 @@ function Billing({ navigation }) {
           </>
         )}
       </ScrollView>
+      <Modal transparent visible={planPicker} animationType="fade" onRequestClose={() => setPlanPicker(false)}>
+        <Pressable style={s.dialogShade} onPress={() => setPlanPicker(false)}>
+          <Pressable style={s.planDialog} onPress={(event) => event.stopPropagation()}>
+            <View style={s.dialogIcon}><CreditCard color={colors.primary} size={25} /></View>
+            <Text style={s.dialogTitle}>Upgrade to EchoNotes Pro</Text>
+            <Text style={s.dialogText}>Choose the billing interval that works for you.</Text>
+            <Pressable style={s.priceChoice} onPress={() => { setPlanPicker(false); void runBilling("monthly"); }}>
+              <View><Text style={s.priceTitle}>Monthly</Text><Text style={s.priceCaption}>Flexible monthly billing</Text></View>
+              <Text style={s.priceAmount}>₦1,500<Text style={s.priceUnit}> / month</Text></Text>
+            </Pressable>
+            <Pressable style={[s.priceChoice, s.priceChoiceFeatured]} onPress={() => { setPlanPicker(false); void runBilling("annually"); }}>
+              <View><View style={s.saveBadge}><Text style={s.saveBadgeText}>SAVE ₦3,000</Text></View><Text style={s.priceTitle}>Annual</Text><Text style={s.priceCaption}>Best value for a full year</Text></View>
+              <Text style={s.priceAmount}>₦15,000<Text style={s.priceUnit}> / year</Text></Text>
+            </Pressable>
+            <Button kind="outline" onPress={() => setPlanPicker(false)}>Maybe later</Button>
+          </Pressable>
+        </Pressable>
+      </Modal>
+      <Modal transparent visible={!!billingNotice} animationType="fade" onRequestClose={() => setBillingNotice(null)}>
+        <Pressable style={s.dialogShade} onPress={() => setBillingNotice(null)}>
+          <Pressable style={s.noticeDialog} onPress={(event) => event.stopPropagation()}>
+            <View style={s.dialogIcon}>{billingNotice?.title === "Payment confirmed" ? <Check color={colors.success} size={27} /> : <AlertCircle color={colors.danger} size={27} />}</View>
+            <Text style={s.dialogTitle}>{billingNotice?.title}</Text>
+            <Text style={s.dialogText}>{billingNotice?.message}</Text>
+            <Button onPress={() => setBillingNotice(null)}>Okay</Button>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -2117,6 +2144,86 @@ const createStyles = () =>
       lineHeight: 17,
       marginTop: 12,
     },
+    dialogShade: {
+      flex: 1,
+      backgroundColor: "#000b",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20,
+    },
+    planDialog: {
+      width: "100%",
+      maxWidth: 430,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      padding: 20,
+    },
+    noticeDialog: {
+      width: "100%",
+      maxWidth: 380,
+      alignItems: "center",
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      padding: 22,
+    },
+    dialogIcon: {
+      width: 52,
+      height: 52,
+      borderRadius: 18,
+      alignItems: "center",
+      justifyContent: "center",
+      alignSelf: "center",
+      backgroundColor: colors.primarySoft,
+      marginBottom: 13,
+    },
+    dialogTitle: {
+      color: colors.text,
+      fontSize: 21,
+      fontWeight: "900",
+      textAlign: "center",
+    },
+    dialogText: {
+      color: colors.muted,
+      fontSize: 13,
+      lineHeight: 20,
+      textAlign: "center",
+      marginTop: 7,
+      marginBottom: 15,
+    },
+    priceChoice: {
+      minHeight: 82,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.raised,
+      borderRadius: 16,
+      padding: 14,
+      marginTop: 10,
+    },
+    priceChoiceFeatured: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primarySoft,
+    },
+    priceTitle: { color: colors.text, fontSize: 16, fontWeight: "800" },
+    priceCaption: { color: colors.muted, fontSize: 11, marginTop: 4 },
+    priceAmount: { color: colors.text, fontSize: 16, fontWeight: "900" },
+    priceUnit: { color: colors.muted, fontSize: 10, fontWeight: "500" },
+    saveBadge: {
+      alignSelf: "flex-start",
+      borderRadius: 8,
+      backgroundColor: colors.primary,
+      paddingHorizontal: 6,
+      paddingVertical: 3,
+      marginBottom: 5,
+    },
+    saveBadgeText: { color: "white", fontSize: 8, fontWeight: "900" },
     tabs: {
       flexGrow: 0,
       height: 43,
