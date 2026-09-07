@@ -56,3 +56,8 @@ The endpoint validates Paystack's `x-paystack-signature` before processing any e
 7. Only then repeat the plan creation and environment setup with live Paystack keys and plan codes.
 
 The payment callback improves immediate feedback, but the signed webhook remains the authoritative activation path.
+
+
+
+Note: If you want to do live go to paystack dashboard switch to live and copy the plans code and update
+it in the vercel environment viriables
