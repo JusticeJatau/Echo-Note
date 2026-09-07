@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
   ScrollView,
+  Share as NativeShare,
   StyleSheet,
   Switch,
   Text,
@@ -70,9 +72,10 @@ import { ThemeProvider, useAppTheme } from "./src/theme/ThemeProvider";
 import { startAutoSync, syncNow } from "./src/lib/sync";
 import {
   billingOverview,
-  openBilling,
+  manageSubscription,
   registerDevice,
   removeDevice,
+  startCheckout,
 } from "./src/lib/billing";
 import { exportPdf, exportText, pickNotes } from "./src/lib/noteTools";
 import { supabase } from "./src/lib/supabase";
@@ -763,14 +766,46 @@ function ShareScreen({ route, navigation }) {
   );
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!user || !note) return;
+    let active = true;
+    supabase
+      .from("note_shares")
+      .select("share_id")
+      .eq("note_id", note.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active && data?.share_id)
+          setLink(`${process.env.EXPO_PUBLIC_APP_URL ?? "https://echo-note-wine.vercel.app"}/share/${data.share_id}`);
+      });
+    return () => { active = false; };
+  }, [user?.id, note?.id]);
   async function create() {
     if (!user)
       return Alert.alert("Sign in required", "Sign in to create public links.");
+    if (!note) return Alert.alert("Could not share", "This note is no longer available.");
     setBusy(true);
-    await syncNow(user.id);
+    const syncResult = await syncNow(user.id);
+    if (!syncResult.ok) {
+      setBusy(false);
+      return Alert.alert("Could not share", "Connect to the internet and let this note finish syncing first.");
+    }
+    const { data: existing, error: existingError } = await supabase
+      .from("note_shares")
+      .select("share_id")
+      .eq("note_id", note.id)
+      .maybeSingle();
+    if (existingError) {
+      setBusy(false);
+      return Alert.alert("Could not share", existingError.message);
+    }
+    if (existing?.share_id) {
+      setBusy(false);
+      return setLink(`${process.env.EXPO_PUBLIC_APP_URL ?? "https://echo-note-wine.vercel.app"}/share/${existing.share_id}`);
+    }
     const shareId =
       Math.random().toString(36).slice(2) + Date.now().toString(36);
-    const { error } = await supabase.from("note_shares").upsert({
+    const { error } = await supabase.from("note_shares").insert({
       share_id: shareId,
       note_id: note.id,
       user_id: user.id,
@@ -779,11 +814,19 @@ function ShareScreen({ route, navigation }) {
       tags: note.tags ?? [],
     });
     setBusy(false);
-    if (error) Alert.alert("Could not share", error.message);
+    if (error) Alert.alert("Could not share", error.message?.includes("SHARE_LINK_LIMIT_REACHED") ? "Basic accounts can have three active public links. Disable an old link or upgrade to Pro." : error.message);
     else
       setLink(
         `${process.env.EXPO_PUBLIC_APP_URL ?? "https://echo-note-wine.vercel.app"}/share/${shareId}`,
       );
+  }
+  async function stopSharing() {
+    if (!user || !note) return;
+    setBusy(true);
+    const { error } = await supabase.from("note_shares").delete().eq("note_id", note.id).eq("user_id", user.id);
+    setBusy(false);
+    if (error) Alert.alert("Could not stop sharing", error.message);
+    else setLink("");
   }
   return (
     <SafeAreaView style={s.page}>
@@ -801,11 +844,19 @@ function ShareScreen({ route, navigation }) {
             <Button onPress={() => Clipboard.setStringAsync(link)}>
               Copy link
             </Button>
+            <Button kind="outline" onPress={() => NativeShare.share({ message: link, url: link, title: note?.title ?? "EchoNotes" })}>
+              Share link
+            </Button>
+            <Button kind="outline" disabled={busy} onPress={stopSharing}>
+              Stop sharing
+            </Button>
           </View>
         )}
-        <Button disabled={busy} onPress={create}>
-          {busy ? "Creating…" : "Create share link"}
-        </Button>
+        {!link && (
+          <Button disabled={busy} onPress={create}>
+            {busy ? "Creating…" : "Create share link"}
+          </Button>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -1160,11 +1211,37 @@ function Billing({ navigation }) {
   useScreenTheme();
   const user = useAuthStore((x) => x.session?.user);
   const [data, setData] = useState();
-  useEffect(() => {
-    billingOverview(user.id)
+  const [busy, setBusy] = useState(false);
+  const refreshBilling = () => billingOverview(user.id)
       .then(setData)
       .catch((e) => Alert.alert("Billing", e.message));
-  }, []);
+  useEffect(() => { refreshBilling(); }, [user.id]);
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void refreshBilling();
+    });
+    return () => subscription.remove();
+  }, [user.id]);
+  async function runBilling(action) {
+    setBusy(true);
+    try {
+      const result = action === "manage" ? await manageSubscription() : await startCheckout(action);
+      if (result?.cancelled) return;
+      await refreshBilling();
+      if (action !== "manage") Alert.alert("Payment confirmed", "EchoNotes Pro is now active on your account.");
+    } catch (error) {
+      Alert.alert("Billing", error?.message ?? "Could not open billing.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  function openPlanChoice() {
+    Alert.alert("Upgrade to EchoNotes Pro", "Choose your billing interval.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Monthly · ₦1,500", onPress: () => void runBilling("monthly") },
+      { text: "Annual · ₦15,000", onPress: () => void runBilling("annually") },
+    ]);
+  }
   return (
     <SafeAreaView style={s.page}>
       <Header title="Plan and billing" back navigation={navigation} />
@@ -1243,14 +1320,13 @@ function Billing({ navigation }) {
                 }
               />
             </View>
-            <Button onPress={openBilling}>
-              {data.plan === "pro"
+            <Button disabled={busy} onPress={() => data.plan === "pro" ? void runBilling("manage") : openPlanChoice()}>
+              {busy ? "Opening secure billing…" : data.plan === "pro"
                 ? "Manage Pro subscription"
-                : "View Pro plans"}
+                : "Upgrade to Pro"}
             </Button>
             <Text style={s.billingNote}>
-              Checkout and subscription management open on the secure EchoNotes
-              website.
+              Paystack opens securely and returns you to EchoNotes after payment.
             </Text>
           </>
         )}

@@ -22,8 +22,10 @@ import { Route as AppProfileRouteImport } from './routes/app.profile'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppTrashRouteImport } from './routes/app.trash'
 import { Route as ShareShareIdRouteImport } from './routes/share.$shareId'
+import { Route as ApiMobileBillingRouteImport } from './routes/api.mobile.billing'
 import { Route as ApiPaystackWebhookRouteImport } from './routes/api.paystack.webhook'
 import { Route as AppFoldersFolderIdRouteImport } from './routes/app.folders.$folderId'
+import { Route as ApiMobileBillingCallbackRouteImport } from './routes/api.mobile.billing.callback'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -90,6 +92,11 @@ const ShareShareIdRoute = ShareShareIdRouteImport.update({
   path: '/share/$shareId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMobileBillingRoute = ApiMobileBillingRouteImport.update({
+  id: '/api/mobile/billing',
+  path: '/api/mobile/billing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPaystackWebhookRoute = ApiPaystackWebhookRouteImport.update({
   id: '/api/paystack/webhook',
   path: '/api/paystack/webhook',
@@ -100,6 +107,12 @@ const AppFoldersFolderIdRoute = AppFoldersFolderIdRouteImport.update({
   path: '/folders/$folderId',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiMobileBillingCallbackRoute =
+  ApiMobileBillingCallbackRouteImport.update({
+    id: '/callback',
+    path: '/callback',
+    getParentRoute: () => ApiMobileBillingRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -115,8 +128,10 @@ export interface FileRoutesByFullPath {
   '/app/trash': typeof AppTrashRoute
   '/share/$shareId': typeof ShareShareIdRoute
   '/app/': typeof AppIndexRoute
+  '/api/mobile/billing': typeof ApiMobileBillingRouteWithChildren
   '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
   '/app/folders/$folderId': typeof AppFoldersFolderIdRoute
+  '/api/mobile/billing/callback': typeof ApiMobileBillingCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -131,8 +146,10 @@ export interface FileRoutesByTo {
   '/app/trash': typeof AppTrashRoute
   '/share/$shareId': typeof ShareShareIdRoute
   '/app': typeof AppIndexRoute
+  '/api/mobile/billing': typeof ApiMobileBillingRouteWithChildren
   '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
   '/app/folders/$folderId': typeof AppFoldersFolderIdRoute
+  '/api/mobile/billing/callback': typeof ApiMobileBillingCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -149,8 +166,10 @@ export interface FileRoutesById {
   '/app/trash': typeof AppTrashRoute
   '/share/$shareId': typeof ShareShareIdRoute
   '/app/': typeof AppIndexRoute
+  '/api/mobile/billing': typeof ApiMobileBillingRouteWithChildren
   '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
   '/app/folders/$folderId': typeof AppFoldersFolderIdRoute
+  '/api/mobile/billing/callback': typeof ApiMobileBillingCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -168,8 +187,10 @@ export interface FileRouteTypes {
     | '/app/trash'
     | '/share/$shareId'
     | '/app/'
+    | '/api/mobile/billing'
     | '/api/paystack/webhook'
     | '/app/folders/$folderId'
+    | '/api/mobile/billing/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -184,8 +205,10 @@ export interface FileRouteTypes {
     | '/app/trash'
     | '/share/$shareId'
     | '/app'
+    | '/api/mobile/billing'
     | '/api/paystack/webhook'
     | '/app/folders/$folderId'
+    | '/api/mobile/billing/callback'
   id:
     | '__root__'
     | '/'
@@ -201,8 +224,10 @@ export interface FileRouteTypes {
     | '/app/trash'
     | '/share/$shareId'
     | '/app/'
+    | '/api/mobile/billing'
     | '/api/paystack/webhook'
     | '/app/folders/$folderId'
+    | '/api/mobile/billing/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -214,6 +239,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
   ShareShareIdRoute: typeof ShareShareIdRoute
+  ApiMobileBillingRoute: typeof ApiMobileBillingRouteWithChildren
   ApiPaystackWebhookRoute: typeof ApiPaystackWebhookRoute
 }
 
@@ -310,6 +336,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShareShareIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/mobile/billing': {
+      id: '/api/mobile/billing'
+      path: '/api/mobile/billing'
+      fullPath: '/api/mobile/billing'
+      preLoaderRoute: typeof ApiMobileBillingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/paystack/webhook': {
       id: '/api/paystack/webhook'
       path: '/api/paystack/webhook'
@@ -323,6 +356,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/folders/$folderId'
       preLoaderRoute: typeof AppFoldersFolderIdRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/api/mobile/billing/callback': {
+      id: '/api/mobile/billing/callback'
+      path: '/callback'
+      fullPath: '/api/mobile/billing/callback'
+      preLoaderRoute: typeof ApiMobileBillingCallbackRouteImport
+      parentRoute: typeof ApiMobileBillingRoute
     }
   }
 }
@@ -347,6 +387,17 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
+interface ApiMobileBillingRouteChildren {
+  ApiMobileBillingCallbackRoute: typeof ApiMobileBillingCallbackRoute
+}
+
+const ApiMobileBillingRouteChildren: ApiMobileBillingRouteChildren = {
+  ApiMobileBillingCallbackRoute: ApiMobileBillingCallbackRoute,
+}
+
+const ApiMobileBillingRouteWithChildren =
+  ApiMobileBillingRoute._addFileChildren(ApiMobileBillingRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
@@ -356,6 +407,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   VerifyEmailRoute: VerifyEmailRoute,
   ShareShareIdRoute: ShareShareIdRoute,
+  ApiMobileBillingRoute: ApiMobileBillingRouteWithChildren,
   ApiPaystackWebhookRoute: ApiPaystackWebhookRoute,
 }
 export const routeTree = rootRouteImport

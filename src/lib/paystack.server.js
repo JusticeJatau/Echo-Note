@@ -141,6 +141,132 @@ export async function applySuccessfulTransaction(data) {
   return { userId, interval, reference };
 }
 
+export async function initializePaystackCheckout({ userId, email, interval, callbackUrl }) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const plan = getPaystackPlan(interval);
+  if (!email) throw new Error("Your account has no billing email.");
+
+  const { data: currentSubscription } = await supabaseAdmin
+    .from("subscriptions")
+    .select("plan,status,current_period_end")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const stillPaid = currentSubscription?.current_period_end && new Date(currentSubscription.current_period_end).getTime() > Date.now();
+  if (currentSubscription?.plan === "pro" && (currentSubscription.status === "active" || stillPaid)) {
+    throw new Error("This account already has an active Pro plan. Manage it from Billing settings.");
+  }
+
+  const reference = `ECHONOTES-${Date.now()}-${crypto.randomUUID()}`;
+  const { error } = await supabaseAdmin.from("payment_transactions").insert({
+    user_id: userId,
+    reference,
+    interval,
+    amount_kobo: plan.amount,
+  });
+  if (error) throw error;
+
+  try {
+    const checkout = await paystackRequest("/transaction/initialize", {
+      method: "POST",
+      body: JSON.stringify({
+        email,
+        amount: plan.amount,
+        plan: plan.planCode,
+        reference,
+        callback_url: callbackUrl,
+        metadata: JSON.stringify({ user_id: userId, interval, product: "echonotes_pro" }),
+      }),
+    });
+    return { authorizationUrl: checkout.authorization_url, reference };
+  } catch (error) {
+    await supabaseAdmin.from("payment_transactions").update({ status: "failed" }).eq("reference", reference);
+    throw error;
+  }
+}
+
+export async function verifyPaystackCheckout({ userId, reference }) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: pending, error } = await supabaseAdmin
+    .from("payment_transactions")
+    .select("user_id")
+    .eq("reference", reference)
+    .single();
+  if (error || pending.user_id !== userId) throw new Error("This payment reference does not belong to your account.");
+  const transaction = await paystackRequest(`/transaction/verify/${encodeURIComponent(reference)}`);
+  const result = await applySuccessfulTransaction(transaction);
+  if (result.userId !== userId) throw new Error("This payment belongs to another account.");
+  return { ok: true, plan: "pro" };
+}
+
+export async function getPaystackManagementLink({ userId, email }) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    .from("subscriptions")
+    .select("provider_subscription_id,provider_customer_code,billing_interval")
+    .eq("user_id", userId)
+    .single();
+  if (error) throw error;
+
+  let subscriptionCode = data?.provider_subscription_id;
+  let customerCode = data?.provider_customer_code;
+  let interval = data?.billing_interval;
+
+  if (!subscriptionCode) {
+    const { data: events, error: eventError } = await supabaseAdmin
+      .from("billing_events")
+      .select("payload")
+      .eq("event_type", "subscription.create")
+      .order("processed_at", { ascending: false })
+      .limit(100);
+    if (eventError) throw eventError;
+    const recovered = subscriptionFromStoredEvents(events, email, customerCode);
+    if (recovered) {
+      customerCode ??= recovered.customerCode;
+      subscriptionCode = recovered.subscriptionCode;
+      const { error: updateError } = await supabaseAdmin.from("subscriptions").update({
+        provider_subscription_id: subscriptionCode,
+        provider_customer_id: customerCode,
+        provider_customer_code: customerCode,
+        provider_email_token: recovered.emailToken,
+      }).eq("user_id", userId);
+      if (updateError) throw updateError;
+    }
+  }
+
+  if (!subscriptionCode) {
+    const { data: payment, error: paymentError } = await supabaseAdmin
+      .from("payment_transactions")
+      .select("interval,raw_response")
+      .eq("user_id", userId)
+      .eq("status", "success")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (paymentError) throw paymentError;
+    interval ??= payment?.interval;
+    const rawCustomer = payment?.raw_response?.customer;
+    customerCode ??= typeof rawCustomer === "string" ? rawCustomer : rawCustomer?.customer_code ?? null;
+    if (customerCode) {
+      const planCode = interval ? getPaystackPlan(interval).planCode : null;
+      const subscription = await findPaystackSubscription(customerCode, planCode);
+      subscriptionCode = subscription?.subscription_code ?? null;
+      if (subscriptionCode) {
+        const { error: updateError } = await supabaseAdmin.from("subscriptions").update({
+          provider_subscription_id: subscriptionCode,
+          provider_customer_id: customerCode,
+          provider_customer_code: customerCode,
+          provider_email_token: subscription?.email_token ?? null,
+        }).eq("user_id", userId);
+        if (updateError) throw updateError;
+      }
+    }
+  }
+
+  if (!subscriptionCode) throw new Error("No active Paystack subscription was found for this billing account.");
+  const result = await paystackRequest(`/subscription/${encodeURIComponent(subscriptionCode)}/manage/link`);
+  return { url: result.link };
+}
+
 export async function processPaystackEvent(event) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const data = event?.data ?? {};
