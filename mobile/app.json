@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "EchoNotes",
+    "slug": "echonotes",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#090b10"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.echo8v.echonotes"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#090b10"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.echo8v.echonotes"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": ["expo-secure-store", "expo-sqlite"]
+  }
+}
