@@ -26,7 +26,10 @@
         "backgroundColor": "#090b10"
       },
       "edgeToEdgeEnabled": false,
-      "package": "com.echo8v.echonotes"
+      "package": "com.echo8v.echonotes",
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -64,6 +67,11 @@
           }
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "170faac7-9c53-4292-bcaa-5b2f9d367c56"
+      }
+    }
   }
 }
