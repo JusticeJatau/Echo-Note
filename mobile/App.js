@@ -1578,7 +1578,7 @@ function Help({ navigation }) {
       <Header title="Help" back navigation={navigation} />
       <ScrollView contentContainerStyle={s.pad}>
         <View style={s.helpHero}>
-          <Image source={require("./assets/icon.png")} resizeMode="contain" style={s.helpLogo} />
+          <Image source={require("./assets/icon-2.png")} resizeMode="contain" style={s.helpLogo} />
           <View style={{ flex: 1 }}><Text style={s.helpHeroTitle}>How can we help?</Text><Text style={s.small}>Guides, product information and support.</Text></View>
         </View>
         <Text style={s.billingSectionTitle}>Explore EchoNotes</Text>
@@ -1593,7 +1593,7 @@ function Help({ navigation }) {
         <Pressable style={s.helpAction} onPress={() => navigation.navigate("Feedback", { type: "feature" })}><View style={s.helpActionIcon}><Lightbulb color={colors.warning} size={20} /></View><View style={{ flex: 1 }}><Text style={s.value}>Request a feature</Text><Text style={s.small}>Share an idea that would improve your workflow.</Text></View><ChevronDown color={colors.muted} size={17} style={{ transform: [{ rotate: "-90deg" }] }} /></Pressable>
         <Text style={s.billingSectionTitle}>About</Text>
         <View style={s.aboutCard}>
-          <Image source={require("./assets/icon.png")} resizeMode="contain" style={s.aboutLogo} />
+          <Image source={require("./assets/icon-2.png")} resizeMode="contain" style={s.aboutLogo} />
           <Text style={s.aboutTitle}>EchoNotes</Text><Text style={s.aboutVersion}>Mobile beta · Version 0.1.0</Text>
           <Text style={s.aboutText}>EchoNotes is a focused, offline-first personal notes workspace built by Echo8V. It gives everyone a simple writing experience while still supporting Markdown, live preview, folders, tags, public links, PDF export and secure cross-device sync.</Text>
           <View style={s.aboutStatus}><View style={s.aboutStatusRow}><Text style={s.small}>Local-first storage</Text><Text style={s.aboutEnabled}>Enabled</Text></View><View style={s.aboutStatusRow}><Text style={s.small}>Markdown live preview</Text><Text style={s.aboutEnabled}>Enabled</Text></View><View style={s.aboutStatusRow}><Text style={s.small}>Cloud sync</Text><Text style={s.value}>Supabase</Text></View><View style={s.aboutStatusRow}><Text style={s.small}>Payments</Text><Text style={s.value}>Paystack</Text></View></View>
@@ -1830,7 +1830,7 @@ function ThemedSplash({ opacity, statusBarStyle }) {
       <StatusBar style={statusBarStyle} backgroundColor={colors.background} translucent={false} />
       <View style={s.splashGlow} />
       <View style={s.splashLogoWrap}>
-        <Image source={require("./assets/icon.png")} resizeMode="contain" style={s.splashLogo} />
+        <Image source={require("./assets/icon-2.png")} resizeMode="contain" style={s.splashLogo} />
       </View>
       <Text style={s.splashTitle}>EchoNotes</Text>
       <Text style={s.splashTagline}>Your thoughts, organized.</Text>
