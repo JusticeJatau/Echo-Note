@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Bell, Check, ChevronRight, ClipboardCopy, CreditCard, Database, ExternalLink, Languages, Lock, Monitor, Palette, QrCode, Radio, RefreshCw, ShieldCheck, SlidersHorizontal, Smartphone, Trash2, UserRound, Wifi } from "lucide-react";
+import { Bell, Check, ChevronRight, ClipboardCopy, CreditCard, Crown, Database, ExternalLink, Languages, Lock, Monitor, Palette, QrCode, Radio, RefreshCw, ShieldCheck, SlidersHorizontal, Smartphone, Trash2, UserRound, Wifi } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { syncNow } from "@/lib/sync";
 import { useEcho } from "@/store/echo";
@@ -19,7 +19,7 @@ function Choice({ active, children, onClick }) {
   return <button type="button" onClick={onClick} className={`rounded-lg border px-3 py-2 text-sm ${active ? "border-primary bg-primary/10 text-primary" : "border-border bg-surface/40 hover:bg-surface"}`}>{children}</button>;
 }
 
-function ClipboardSettings() {
+function ClipboardSettings({ user, plan, onUpgrade, onSignIn }) {
   const [bridgeStatus, setBridgeStatus] = useState("checking");
   const [lastChecked, setLastChecked] = useState(null);
 
@@ -38,7 +38,17 @@ function ClipboardSettings() {
     }
   }
 
-  useEffect(() => { void checkBridge(); }, []);
+  useEffect(() => { if (plan === "pro") void checkBridge(); }, [plan]);
+
+  if (plan !== "pro") return <div className="py-4 text-center">
+    <span className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 text-primary"><Lock className="size-7"/></span>
+    <span className="mx-auto mt-4 flex w-fit items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary"><Crown className="size-3"/>EchoNotes Pro</span>
+    <h2 className="mt-4 text-xl font-semibold">Clipboard Sync is a Pro feature</h2>
+    <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">Transfer encrypted text, links and code between Android and Windows through local Wi-Fi or hotspot—even without internet.</p>
+    <div className="mx-auto mt-5 max-w-sm space-y-2 text-left">{["Encrypted phone-to-PC transfers", "Offline local-network connection", "Trusted devices and clipboard history"].map((text) => <div key={text} className="flex items-center gap-2 rounded-lg bg-surface/50 px-3 py-2 text-sm"><Check className="size-4 text-success"/>{text}</div>)}</div>
+    <button type="button" onClick={user ? onUpgrade : onSignIn} className="mt-6 h-11 w-full rounded-lg bg-primary text-sm font-medium text-primary-foreground">{user ? "Upgrade to Pro" : "Sign in to upgrade"}</button>
+    <p className="mt-3 text-xs text-muted-foreground">Clipboard Sync remains visible on Basic, but connecting and transferring require Pro.</p>
+  </div>;
 
   const running = bridgeStatus === "running";
   return <>
@@ -232,7 +242,7 @@ function SettingsPage() {
         {section === "appearance" && <><h2 className="font-semibold">Appearance</h2><p className="mt-1 text-sm text-muted-foreground">Choose how EchoNotes looks on this device.</p><div className="mt-5 flex flex-wrap gap-2">{["dark", "light", "system"].map((theme) => <Choice key={theme} active={preferences.theme === theme} onClick={() => setPreference("theme", theme)}>{theme[0].toUpperCase() + theme.slice(1)}</Choice>)}</div></>}
         {section === "editor" && <><h2 className="font-semibold">Editor</h2><div className="mt-5 space-y-5"><div><p className="mb-2 text-sm text-muted-foreground">Writing mode</p><div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={() => setPreference("editorMode", "live-preview")} className={`rounded-xl border p-3 text-left ${preferences.editorMode === "live-preview" ? "border-primary bg-primary/10" : "border-border bg-surface/40"}`}><span className="text-sm font-medium">Live Preview</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">Hide Markdown symbols except on the line you're editing.</span></button><button type="button" onClick={() => setPreference("editorMode", "source")} className={`rounded-xl border p-3 text-left ${preferences.editorMode === "source" ? "border-primary bg-primary/10" : "border-border bg-surface/40"}`}><span className="text-sm font-medium">Source Mode</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">Always display the complete Markdown syntax.</span></button></div></div><label className="block text-sm"><span className="mb-2 block text-muted-foreground">Text size</span><select value={preferences.editorFontSize} onChange={(e) => setPreference("editorFontSize", Number(e.target.value))} className="h-10 w-full rounded-lg border border-input bg-surface px-3"><option value="14">Small — 14px</option><option value="16">Normal — 16px</option><option value="18">Large — 18px</option><option value="20">Extra large — 20px</option></select></label><label className="block text-sm"><span className="mb-2 block text-muted-foreground">Autosave delay</span><select value={preferences.autosaveDelay} onChange={(e) => setPreference("autosaveDelay", Number(e.target.value))} className="h-10 w-full rounded-lg border border-input bg-surface px-3"><option value="300">Fast — 0.3 seconds</option><option value="500">Normal — 0.5 seconds</option><option value="1000">1 second</option><option value="2000">2 seconds</option></select></label><div className="flex items-center justify-between gap-4"><div><p className="text-sm font-medium">Spell check</p><p className="text-xs text-muted-foreground">Use your browser's spelling suggestions.</p></div><Switch label="Spell check" checked={preferences.spellCheck} onChange={(value) => setPreference("spellCheck", value)} /></div></div></>}
         {section === "sync" && <><h2 className="font-semibold">Sync</h2><p className="mt-1 text-sm text-muted-foreground">{user ? `Status: ${syncState}. ${lastSyncedAt ? `Last synced ${new Date(lastSyncedAt).toLocaleString()}.` : "Not synced yet."}` : "Sign in to sync notes across devices."}</p>{user ? <button type="button" disabled={syncState === "syncing"} onClick={() => void syncNow(user.id)} className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{syncState === "syncing" ? "Syncing…" : "Sync now"}</button> : <button type="button" onClick={() => void navigate({ to: "/login" })} className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Sign in</button>}</>}
-        {section === "clipboard" && <ClipboardSettings />}
+        {section === "clipboard" && <ClipboardSettings user={user} plan={billing?.plan ?? "basic"} onUpgrade={() => useEcho.getState().setPanel("upgrade")} onSignIn={() => void navigate({ to: "/login" })} />}
         {section === "billing" && <BillingSettings user={user} billing={billing} busy={billingBusy} error={billingError} onRefresh={refreshBilling} onRemoveDevice={disconnectDevice} onUpgrade={() => useEcho.getState().setPanel("upgrade")} onManage={manageSubscription} />}
         {section === "privacy" && <><h2 className="font-semibold">Security & Privacy</h2><div className="mt-5 flex items-start justify-between gap-5"><div><p className="text-sm font-medium">Keep notes available after sign-out</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Copies this account's latest notes into the offline guest workspace when you sign out. Anyone using this browser can then read them.</p></div><Switch label="Keep notes after sign-out" checked={preferences.keepDataAfterLogout} onChange={(value) => setPreference("keepDataAfterLogout", value)} /></div><div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs leading-5 text-muted-foreground">When you sign in again, EchoNotes will ask whether to merge the offline copy into your account or keep it separate.</div></>}
         {section === "notifications" && <><h2 className="font-semibold">Notifications</h2><div className="mt-5 flex items-start justify-between gap-5"><div><p className="text-sm font-medium">Sync notifications</p><p className="mt-1 text-xs text-muted-foreground">Notify you when pending offline changes finish syncing.</p></div><Switch label="Sync notifications" checked={preferences.notifications} onChange={(value) => void toggleNotifications(value)} /></div>{typeof Notification !== "undefined" && Notification.permission === "denied" ? <p className="mt-4 text-xs text-destructive">Notifications are blocked in your browser settings.</p> : null}</>}
