@@ -35,6 +35,7 @@ import {
   ChevronDown,
   Cloud,
   Code,
+  Copy,
   CreditCard,
   Database,
   Download,
@@ -48,16 +49,21 @@ import {
   Lightbulb,
   LogIn,
   LogOut,
+  Laptop,
   MessageSquare,
   MoreHorizontal,
   Palette,
   Plus,
   Quote,
+  QrCode,
+  Radio,
   RotateCcw,
+  ScanLine,
   Search,
   Settings,
   Share2,
   ShieldCheck,
+  Send,
   Star,
   Strikethrough,
   Smartphone,
@@ -1011,6 +1017,12 @@ function SettingsScreen({ navigation }) {
 
         <SectionLabel icon={Database} title="Data and sync" />
         <View style={s.settingsGroup}>
+          <NavigationRow
+            icon={Radio}
+            label="Nearby clipboard sync"
+            detail="Phone, PC and hotspot pairing"
+            onPress={() => navigation.navigate("ClipboardSync")}
+          />
           <Toggle
             label="Keep data after sign out"
             value={p.keepDataAfterLogout}
@@ -1096,6 +1108,88 @@ function SettingsScreen({ navigation }) {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+function ClipboardSync({ navigation }) {
+  useScreenTheme();
+  const [notice, setNotice] = useState(false);
+  const comingSoon = () => setNotice(true);
+  return (
+    <SafeAreaView style={s.page}>
+      <Header title="Clipboard sync" back navigation={navigation} />
+      <ScrollView contentContainerStyle={s.clipboardContent} showsVerticalScrollIndicator={false}>
+        <View style={s.clipboardHero}>
+          <View style={s.clipboardHeroIcon}><Copy color={colors.primary} size={29} /></View>
+          <View style={s.clipboardBadge}><Radio color={colors.primary} size={12} /><Text style={s.clipboardBadgeText}>COMING SOON</Text></View>
+          <Text style={s.clipboardTitle}>Copy here. Paste there.</Text>
+          <Text style={s.clipboardLead}>Share text, links and code directly between your Android phones and Windows PC—even through a hotspot with no internet.</Text>
+        </View>
+
+        <View style={s.clipboardStatus}>
+          <View style={s.clipboardStatusDot} />
+          <View style={{ flex: 1 }}><Text style={s.value}>Nearby sync is not connected</Text><Text style={s.small}>Your clipboard remains private on this device.</Text></View>
+          <Text style={s.clipboardLocal}>OFFLINE</Text>
+        </View>
+
+        <Text style={s.billingSectionTitle}>Pair a device</Text>
+        <View style={s.clipboardActions}>
+          <Pressable style={s.clipboardAction} onPress={comingSoon}>
+            <View style={s.clipboardActionIcon}><ScanLine color={colors.primary} size={24} /></View>
+            <Text style={s.clipboardActionTitle}>Scan QR</Text>
+            <Text style={s.clipboardActionText}>Scan the code shown on another EchoNotes device.</Text>
+          </Pressable>
+          <Pressable style={s.clipboardAction} onPress={comingSoon}>
+            <View style={s.clipboardActionIcon}><QrCode color={colors.primary} size={24} /></View>
+            <Text style={s.clipboardActionTitle}>Show my QR</Text>
+            <Text style={s.clipboardActionText}>Let another phone or PC pair with this device.</Text>
+          </Pressable>
+        </View>
+
+        <Text style={s.billingSectionTitle}>Works without internet</Text>
+        <View style={s.connectionMethods}>
+          <ConnectionMethod icon={Wifi} title="Same Wi-Fi" text="Connect both devices to one local network." />
+          <ConnectionMethod icon={Smartphone} title="Phone hotspot" text="One phone creates a hotspot and the other device joins it." />
+          <ConnectionMethod icon={Laptop} title="PC hotspot" text="Share directly while your phone is connected to the PC hotspot." />
+        </View>
+
+        <Text style={s.billingSectionTitle}>Trusted devices</Text>
+        <View style={s.clipboardEmpty}>
+          <Laptop color={colors.muted} size={28} />
+          <Text style={s.clipboardEmptyTitle}>No paired devices yet</Text>
+          <Text style={s.small}>Paired phones and computers will appear here with controls to pause or remove access.</Text>
+        </View>
+
+        <Text style={s.billingSectionTitle}>Recent clipboard</Text>
+        <View style={s.clipboardEmpty}>
+          <Copy color={colors.muted} size={28} />
+          <Text style={s.clipboardEmptyTitle}>Nothing received yet</Text>
+          <Text style={s.small}>Recent text, links and code from trusted devices will stay locally on this phone.</Text>
+          <Pressable style={s.clipboardSecondaryButton} onPress={comingSoon}><Send color={colors.primary} size={16} /><Text style={s.clipboardSecondaryText}>Paste and send</Text></Pressable>
+        </View>
+
+        <View style={s.clipboardPrivacy}>
+          <ShieldCheck color={colors.success} size={21} />
+          <View style={{ flex: 1 }}><Text style={s.value}>Private by design</Text><Text style={s.small}>Nearby transfers will be encrypted and sent directly between paired devices. Supabase and the internet are not involved.</Text></View>
+        </View>
+        <Button onPress={comingSoon}>Start nearby connection</Button>
+      </ScrollView>
+
+      <Modal transparent visible={notice} animationType="fade" onRequestClose={() => setNotice(false)}>
+        <Pressable style={s.dialogShade} onPress={() => setNotice(false)}>
+          <Pressable style={s.noticeDialog} onPress={(event) => event.stopPropagation()}>
+            <View style={s.dialogIcon}><Radio color={colors.primary} size={27} /></View>
+            <Text style={s.dialogTitle}>Nearby Clipboard is coming soon</Text>
+            <Text style={s.dialogText}>The complete interface is ready, but device pairing and transfers are not enabled in this release yet.</Text>
+            <Button onPress={() => setNotice(false)}>Got it</Button>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+function ConnectionMethod({ icon: Icon, title, text }) {
+  return <View style={s.connectionMethod}><View style={s.connectionMethodIcon}><Icon color={colors.primary} size={19} /></View><View style={{ flex: 1 }}><Text style={s.value}>{title}</Text><Text style={s.small}>{text}</Text></View><Check color={colors.success} size={17} /></View>;
 }
 function SectionLabel({ icon: Icon, title }) {
   return (
@@ -1484,7 +1578,7 @@ function Help({ navigation }) {
       <Header title="Help" back navigation={navigation} />
       <ScrollView contentContainerStyle={s.pad}>
         <View style={s.helpHero}>
-          <Image source={require("./assets/icon-2.png")} resizeMode="contain" style={s.helpLogo} />
+          <Image source={require("./assets/icon.png")} resizeMode="contain" style={s.helpLogo} />
           <View style={{ flex: 1 }}><Text style={s.helpHeroTitle}>How can we help?</Text><Text style={s.small}>Guides, product information and support.</Text></View>
         </View>
         <Text style={s.billingSectionTitle}>Explore EchoNotes</Text>
@@ -1499,7 +1593,7 @@ function Help({ navigation }) {
         <Pressable style={s.helpAction} onPress={() => navigation.navigate("Feedback", { type: "feature" })}><View style={s.helpActionIcon}><Lightbulb color={colors.warning} size={20} /></View><View style={{ flex: 1 }}><Text style={s.value}>Request a feature</Text><Text style={s.small}>Share an idea that would improve your workflow.</Text></View><ChevronDown color={colors.muted} size={17} style={{ transform: [{ rotate: "-90deg" }] }} /></Pressable>
         <Text style={s.billingSectionTitle}>About</Text>
         <View style={s.aboutCard}>
-          <Image source={require("./assets/icon-2.png")} resizeMode="contain" style={s.aboutLogo} />
+          <Image source={require("./assets/icon.png")} resizeMode="contain" style={s.aboutLogo} />
           <Text style={s.aboutTitle}>EchoNotes</Text><Text style={s.aboutVersion}>Mobile beta · Version 0.1.0</Text>
           <Text style={s.aboutText}>EchoNotes is a focused, offline-first personal notes workspace built by Echo8V. It gives everyone a simple writing experience while still supporting Markdown, live preview, folders, tags, public links, PDF export and secure cross-device sync.</Text>
           <View style={s.aboutStatus}><View style={s.aboutStatusRow}><Text style={s.small}>Local-first storage</Text><Text style={s.aboutEnabled}>Enabled</Text></View><View style={s.aboutStatusRow}><Text style={s.small}>Markdown live preview</Text><Text style={s.aboutEnabled}>Enabled</Text></View><View style={s.aboutStatusRow}><Text style={s.small}>Cloud sync</Text><Text style={s.value}>Supabase</Text></View><View style={s.aboutStatusRow}><Text style={s.small}>Payments</Text><Text style={s.value}>Paystack</Text></View></View>
@@ -1720,6 +1814,7 @@ function AppContent() {
           <Stack.Screen name="Profile" component={Profile} />
           <Stack.Screen name="Billing" component={Billing} />
           <Stack.Screen name="Devices" component={Devices} />
+          <Stack.Screen name="ClipboardSync" component={ClipboardSync} />
           <Stack.Screen name="Alerts" component={Alerts} />
           <Stack.Screen name="Help" component={Help} />
           <Stack.Screen name="Feedback" component={Feedback} />
@@ -1735,7 +1830,7 @@ function ThemedSplash({ opacity, statusBarStyle }) {
       <StatusBar style={statusBarStyle} backgroundColor={colors.background} translucent={false} />
       <View style={s.splashGlow} />
       <View style={s.splashLogoWrap}>
-        <Image source={require("./assets/icon-2.png")} resizeMode="contain" style={s.splashLogo} />
+        <Image source={require("./assets/icon.png")} resizeMode="contain" style={s.splashLogo} />
       </View>
       <Text style={s.splashTitle}>EchoNotes</Text>
       <Text style={s.splashTagline}>Your thoughts, organized.</Text>
@@ -2306,6 +2401,29 @@ const createStyles = () =>
     feedbackTitle: { color: colors.text, fontSize: 21, fontWeight: "900" },
     fieldLabel: { color: colors.muted, fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginTop: 13, marginBottom: 7 },
     feedbackMeta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 8 },
+    clipboardContent: { padding: 18, paddingBottom: 90 },
+    clipboardHero: { alignItems: "center", overflow: "hidden", borderRadius: 24, borderWidth: 1, borderColor: colors.primary + "45", backgroundColor: colors.primarySoft, paddingHorizontal: 20, paddingVertical: 25 },
+    clipboardHeroIcon: { width: 66, height: 66, borderRadius: 22, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.primary + "55", backgroundColor: colors.surface, marginBottom: 13 },
+    clipboardBadge: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 20, backgroundColor: colors.primary + "18", paddingHorizontal: 10, paddingVertical: 5 },
+    clipboardBadgeText: { color: colors.primary, fontSize: 9, fontWeight: "900", letterSpacing: 1.1 },
+    clipboardTitle: { color: colors.text, fontSize: 24, fontWeight: "900", letterSpacing: -0.5, textAlign: "center", marginTop: 13 },
+    clipboardLead: { color: colors.muted, fontSize: 13, lineHeight: 20, textAlign: "center", marginTop: 8 },
+    clipboardStatus: { minHeight: 72, flexDirection: "row", alignItems: "center", gap: 11, borderRadius: 17, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, paddingHorizontal: 14, marginTop: 13 },
+    clipboardStatusDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.muted },
+    clipboardLocal: { color: colors.muted, fontSize: 9, fontWeight: "900", letterSpacing: 1 },
+    clipboardActions: { flexDirection: "row", gap: 10 },
+    clipboardAction: { flex: 1, minHeight: 165, borderRadius: 19, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: 15 },
+    clipboardActionIcon: { width: 46, height: 46, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: colors.primarySoft, marginBottom: 13 },
+    clipboardActionTitle: { color: colors.text, fontSize: 15, fontWeight: "800" },
+    clipboardActionText: { color: colors.muted, fontSize: 11, lineHeight: 17, marginTop: 6 },
+    connectionMethods: { overflow: "hidden", borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+    connectionMethod: { minHeight: 72, flexDirection: "row", alignItems: "center", gap: 11, borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: 14 },
+    connectionMethodIcon: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.primarySoft },
+    clipboardEmpty: { alignItems: "center", borderRadius: 18, borderWidth: 1, borderStyle: "dashed", borderColor: colors.border, backgroundColor: colors.surface, padding: 21 },
+    clipboardEmptyTitle: { color: colors.text, fontSize: 15, fontWeight: "800", marginTop: 10, marginBottom: 4 },
+    clipboardSecondaryButton: { minHeight: 40, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderRadius: 12, borderWidth: 1, borderColor: colors.primary + "66", paddingHorizontal: 15, marginTop: 14 },
+    clipboardSecondaryText: { color: colors.primary, fontSize: 12, fontWeight: "800" },
+    clipboardPrivacy: { flexDirection: "row", alignItems: "flex-start", gap: 11, borderRadius: 16, backgroundColor: colors.success + "12", borderWidth: 1, borderColor: colors.success + "35", padding: 14, marginTop: 20 },
     tabs: {
       flexGrow: 0,
       height: 43,

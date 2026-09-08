@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Bell, ChevronRight, CreditCard, Database, Languages, Lock, Monitor, Palette, SlidersHorizontal, Smartphone, Trash2, UserRound } from "lucide-react";
+import { Bell, ChevronRight, ClipboardCopy, CreditCard, Database, Languages, Lock, Monitor, Palette, QrCode, Radio, ScanLine, ShieldCheck, SlidersHorizontal, Smartphone, Trash2, UserRound, Wifi } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { syncNow } from "@/lib/sync";
 import { useEcho } from "@/store/echo";
@@ -17,6 +17,29 @@ function Switch({ checked, onChange, label }) {
 
 function Choice({ active, children, onClick }) {
   return <button type="button" onClick={onClick} className={`rounded-lg border px-3 py-2 text-sm ${active ? "border-primary bg-primary/10 text-primary" : "border-border bg-surface/40 hover:bg-surface"}`}>{children}</button>;
+}
+
+function ClipboardSettings({ onComingSoon }) {
+  return <>
+    <div className="rounded-2xl border border-primary/30 bg-primary/10 p-5 text-center">
+      <span className="mx-auto flex size-14 items-center justify-center rounded-2xl border border-primary/30 bg-card text-primary"><ClipboardCopy className="size-7"/></span>
+      <span className="mx-auto mt-3 flex w-fit items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary"><Radio className="size-3"/>Coming soon</span>
+      <h2 className="mt-3 text-xl font-semibold">Copy here. Paste there.</h2>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">Share text, links and code directly between your Windows PC and Android phones through local Wi-Fi or a hotspot—without internet.</p>
+    </div>
+    <div className="mt-4 flex items-center gap-3 rounded-xl border border-border bg-surface/40 p-4"><span className="size-2.5 rounded-full bg-muted-foreground"/><div className="flex-1"><p className="text-sm font-medium">Nearby sync is not connected</p><p className="text-xs text-muted-foreground">Your clipboard remains private on this device.</p></div><span className="text-[10px] font-semibold tracking-wider text-muted-foreground">OFFLINE</span></div>
+    <h3 className="mt-6 text-sm font-semibold">Pair a device</h3>
+    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <button type="button" onClick={onComingSoon} className="rounded-xl border border-border bg-surface/40 p-4 text-left hover:border-primary/40 hover:bg-surface"><span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><ScanLine className="size-5"/></span><span className="mt-3 block text-sm font-medium">Scan pairing QR</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">Scan the code displayed by another EchoNotes device.</span></button>
+      <button type="button" onClick={onComingSoon} className="rounded-xl border border-border bg-surface/40 p-4 text-left hover:border-primary/40 hover:bg-surface"><span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><QrCode className="size-5"/></span><span className="mt-3 block text-sm font-medium">Show pairing QR</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">Allow an Android phone to pair with this computer.</span></button>
+    </div>
+    <h3 className="mt-6 text-sm font-semibold">Offline connection options</h3>
+    <div className="mt-3 divide-y divide-border overflow-hidden rounded-xl border border-border">
+      {[[Wifi, "Same Wi-Fi", "Connect both devices to one local network."], [Smartphone, "Phone hotspot", "Join the hotspot created by your Android phone."], [Monitor, "PC hotspot", "Connect your phone directly to this computer's hotspot."]].map(([Icon, title, text]) => <div key={title} className="flex items-center gap-3 p-3.5"><span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="size-4"/></span><span className="flex-1"><b className="block text-sm font-medium">{title}</b><span className="text-xs text-muted-foreground">{text}</span></span><span className="text-success">✓</span></div>)}
+    </div>
+    <div className="mt-5 flex items-start gap-3 rounded-xl border border-success/25 bg-success/10 p-4"><ShieldCheck className="mt-0.5 size-5 shrink-0 text-success"/><div><p className="text-sm font-medium">Private by design</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Nearby transfers will be encrypted and sent directly between paired devices. Supabase and the internet are not involved.</p></div></div>
+    <button type="button" onClick={onComingSoon} className="mt-5 h-11 w-full rounded-lg bg-primary text-sm font-medium text-primary-foreground">Start nearby connection</button>
+  </>;
 }
 
 function formatBytes(bytes) {
@@ -59,6 +82,7 @@ function SettingsPage() {
   const [billing, setBilling] = useState(null);
   const [billingError, setBillingError] = useState("");
   const [billingBusy, setBillingBusy] = useState(false);
+  const [clipboardNotice, setClipboardNotice] = useState(false);
   const addAlert = useNotifications((state) => state.addAlert);
 
   async function refreshStorage() {
@@ -145,6 +169,7 @@ function SettingsPage() {
     [Palette, "appearance", "Appearance", preferences.theme[0].toUpperCase() + preferences.theme.slice(1)],
     [SlidersHorizontal, "editor", "Editor", `${preferences.editorFontSize}px · Autosave`],
     [Database, "sync", "Sync", user ? syncState : "Sign in required"],
+    [ClipboardCopy, "clipboard", "Nearby Clipboard", "Offline phone and PC sharing"],
     [CreditCard, "billing", "Plan & Billing", user ? `${billing?.plan === "pro" ? "Pro" : "Basic"} plan` : "Sign in required"],
     [Lock, "privacy", "Security & Privacy", preferences.keepDataAfterLogout ? "Available after logout" : "Account data hidden"],
     [Bell, "notifications", "Notifications", preferences.notifications ? "On" : "Off"],
@@ -171,6 +196,7 @@ function SettingsPage() {
         {section === "appearance" && <><h2 className="font-semibold">Appearance</h2><p className="mt-1 text-sm text-muted-foreground">Choose how EchoNotes looks on this device.</p><div className="mt-5 flex flex-wrap gap-2">{["dark", "light", "system"].map((theme) => <Choice key={theme} active={preferences.theme === theme} onClick={() => setPreference("theme", theme)}>{theme[0].toUpperCase() + theme.slice(1)}</Choice>)}</div></>}
         {section === "editor" && <><h2 className="font-semibold">Editor</h2><div className="mt-5 space-y-5"><div><p className="mb-2 text-sm text-muted-foreground">Writing mode</p><div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={() => setPreference("editorMode", "live-preview")} className={`rounded-xl border p-3 text-left ${preferences.editorMode === "live-preview" ? "border-primary bg-primary/10" : "border-border bg-surface/40"}`}><span className="text-sm font-medium">Live Preview</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">Hide Markdown symbols except on the line you're editing.</span></button><button type="button" onClick={() => setPreference("editorMode", "source")} className={`rounded-xl border p-3 text-left ${preferences.editorMode === "source" ? "border-primary bg-primary/10" : "border-border bg-surface/40"}`}><span className="text-sm font-medium">Source Mode</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">Always display the complete Markdown syntax.</span></button></div></div><label className="block text-sm"><span className="mb-2 block text-muted-foreground">Text size</span><select value={preferences.editorFontSize} onChange={(e) => setPreference("editorFontSize", Number(e.target.value))} className="h-10 w-full rounded-lg border border-input bg-surface px-3"><option value="14">Small — 14px</option><option value="16">Normal — 16px</option><option value="18">Large — 18px</option><option value="20">Extra large — 20px</option></select></label><label className="block text-sm"><span className="mb-2 block text-muted-foreground">Autosave delay</span><select value={preferences.autosaveDelay} onChange={(e) => setPreference("autosaveDelay", Number(e.target.value))} className="h-10 w-full rounded-lg border border-input bg-surface px-3"><option value="300">Fast — 0.3 seconds</option><option value="500">Normal — 0.5 seconds</option><option value="1000">1 second</option><option value="2000">2 seconds</option></select></label><div className="flex items-center justify-between gap-4"><div><p className="text-sm font-medium">Spell check</p><p className="text-xs text-muted-foreground">Use your browser's spelling suggestions.</p></div><Switch label="Spell check" checked={preferences.spellCheck} onChange={(value) => setPreference("spellCheck", value)} /></div></div></>}
         {section === "sync" && <><h2 className="font-semibold">Sync</h2><p className="mt-1 text-sm text-muted-foreground">{user ? `Status: ${syncState}. ${lastSyncedAt ? `Last synced ${new Date(lastSyncedAt).toLocaleString()}.` : "Not synced yet."}` : "Sign in to sync notes across devices."}</p>{user ? <button type="button" disabled={syncState === "syncing"} onClick={() => void syncNow(user.id)} className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{syncState === "syncing" ? "Syncing…" : "Sync now"}</button> : <button type="button" onClick={() => void navigate({ to: "/login" })} className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Sign in</button>}</>}
+        {section === "clipboard" && <ClipboardSettings onComingSoon={() => setClipboardNotice(true)} />}
         {section === "billing" && <BillingSettings user={user} billing={billing} busy={billingBusy} error={billingError} onRefresh={refreshBilling} onRemoveDevice={disconnectDevice} onUpgrade={() => useEcho.getState().setPanel("upgrade")} onManage={manageSubscription} />}
         {section === "privacy" && <><h2 className="font-semibold">Security & Privacy</h2><div className="mt-5 flex items-start justify-between gap-5"><div><p className="text-sm font-medium">Keep notes available after sign-out</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Copies this account's latest notes into the offline guest workspace when you sign out. Anyone using this browser can then read them.</p></div><Switch label="Keep notes after sign-out" checked={preferences.keepDataAfterLogout} onChange={(value) => setPreference("keepDataAfterLogout", value)} /></div><div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs leading-5 text-muted-foreground">When you sign in again, EchoNotes will ask whether to merge the offline copy into your account or keep it separate.</div></>}
         {section === "notifications" && <><h2 className="font-semibold">Notifications</h2><div className="mt-5 flex items-start justify-between gap-5"><div><p className="text-sm font-medium">Sync notifications</p><p className="mt-1 text-xs text-muted-foreground">Notify you when pending offline changes finish syncing.</p></div><Switch label="Sync notifications" checked={preferences.notifications} onChange={(value) => void toggleNotifications(value)} /></div>{typeof Notification !== "undefined" && Notification.permission === "denied" ? <p className="mt-4 text-xs text-destructive">Notifications are blocked in your browser settings.</p> : null}</>}
@@ -178,5 +204,6 @@ function SettingsPage() {
         {section === "language" && <><h2 className="font-semibold">Language</h2><p className="mt-1 text-sm text-muted-foreground">Choose the document language used by the browser and editor.</p><select value={preferences.language} onChange={(e) => setPreference("language", e.target.value)} className="mt-5 h-10 w-full rounded-lg border border-input bg-surface px-3 text-sm"><option value="en">English</option><option value="ha">Hausa</option></select></>}
       </section>
     </div>
+    {clipboardNotice ? <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4" role="dialog" aria-modal="true"><button type="button" aria-label="Close" className="absolute inset-0" onClick={() => setClipboardNotice(false)}/><div className="relative w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-center shadow-2xl"><span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Radio className="size-7"/></span><h2 className="mt-4 text-lg font-semibold">Nearby Clipboard is coming soon</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">The complete interface is ready, but pairing and local transfers are not enabled in this release yet.</p><button type="button" onClick={() => setClipboardNotice(false)} className="mt-5 h-10 w-full rounded-lg bg-primary text-sm font-medium text-primary-foreground">Got it</button></div></div> : null}
   </div>;
 }
