@@ -4,11 +4,11 @@
     "slug": "echonotes",
     "version": "0.1.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "icon": "./assets/icon-2.png",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/splash-icon-2.png",
       "resizeMode": "contain",
       "backgroundColor": "#090b10"
     },
@@ -22,7 +22,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/adaptive-icon-2.png",
         "backgroundColor": "#090b10"
       },
       "edgeToEdgeEnabled": false,
@@ -32,6 +32,23 @@
       "favicon": "./assets/favicon.png"
     },
     "scheme": "echonotes",
-    "plugins": ["expo-secure-store", "expo-sqlite", "expo-document-picker"]
+    "plugins": [
+      "expo-secure-store",
+      "expo-sqlite",
+      "expo-document-picker",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#f7f7fb",
+          "image": "./assets/splash-icon-2.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#090b10",
+            "image": "./assets/splash-icon-2.png"
+          }
+        }
+      ]
+    ]
   }
 }

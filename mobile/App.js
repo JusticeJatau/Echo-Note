@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   AppState,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -20,12 +22,14 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import * as ExpoSplashScreen from "expo-splash-screen";
 import * as Clipboard from "expo-clipboard";
 import NetInfo from "@react-native-community/netinfo";
 import {
   AlertCircle,
   ArrowLeft,
   Bell,
+  BookOpen,
   Bold,
   Check,
   ChevronDown,
@@ -41,8 +45,10 @@ import {
   HelpCircle,
   Italic,
   List,
+  Lightbulb,
   LogIn,
   LogOut,
+  MessageSquare,
   MoreHorizontal,
   Palette,
   Plus,
@@ -51,6 +57,7 @@ import {
   Search,
   Settings,
   Share2,
+  ShieldCheck,
   Star,
   Strikethrough,
   Smartphone,
@@ -82,6 +89,7 @@ import { supabase } from "./src/lib/supabase";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+void ExpoSplashScreen.preventAutoHideAsync().catch(() => {});
 function useScreenTheme() {
   const theme = useAppTheme();
   s = createStyles();
@@ -1465,31 +1473,37 @@ function Alerts({ navigation }) {
 }
 function Help({ navigation }) {
   useScreenTheme();
+  const [topic, setTopic] = useState("start");
+  const topics = {
+    start: ["Getting started", ["Create a note with the + button. Every change is saved locally automatically.", "Add tags and folders to keep related notes together.", "Sign in when you want encrypted transport and cloud sync across your registered devices.", "Deleted notes remain in Trash until you permanently remove them."]],
+    writing: ["Writing and Markdown", ["Write normally or use Markdown when you need richer structure.", "In Live Preview, Markdown symbols remain visible on the active line and disappear after you move away.", "Select text and use the toolbar for headings, bold, italics, lists, quotes, links and code.", "Export a note as PDF, Markdown or plain text from the note menu."]],
+    offline: ["Offline and sync", ["EchoNotes writes to this phone first, so creating and editing notes does not require internet.", "Signed-in changes wait safely in the offline queue and sync automatically when your connection returns.", "Your Basic plan can sync two devices. You can remove an old device from Settings.", "If two devices edit the same note, the newest confirmed version is kept."]],
+  };
   return (
     <SafeAreaView style={s.page}>
       <Header title="Help" back navigation={navigation} />
       <ScrollView contentContainerStyle={s.pad}>
-        <Text style={s.authTitle}>How can we help?</Text>
-        <Text style={s.muted}>
-          EchoNotes saves locally first. Sign in only when you want cloud sync.
-          Use #tags in search, organize with folders, and export any note as
-          PDF.
-        </Text>
-        <Button
-          kind="outline"
-          onPress={() => navigation.navigate("Feedback", { type: "bug" })}
-        >
-          Report a problem
-        </Button>
-        <Button
-          kind="outline"
-          onPress={() => navigation.navigate("Feedback", { type: "feature" })}
-        >
-          Request a feature
-        </Button>
-        <View style={s.card}>
-          <Text style={s.value}>About EchoNotes</Text>
-          <Text style={s.small}>Offline-first. Fast. Simple. Yours.</Text>
+        <View style={s.helpHero}>
+          <Image source={require("./assets/icon-2.png")} resizeMode="contain" style={s.helpLogo} />
+          <View style={{ flex: 1 }}><Text style={s.helpHeroTitle}>How can we help?</Text><Text style={s.small}>Guides, product information and support.</Text></View>
+        </View>
+        <Text style={s.billingSectionTitle}>Explore EchoNotes</Text>
+        <View style={s.helpTabs}>
+          {[["start", BookOpen, "Start"], ["writing", FileText, "Writing"], ["offline", Wifi, "Offline"]].map(([key, Icon, label]) => (
+            <Pressable key={key} onPress={() => setTopic(key)} style={[s.helpTab, topic === key && s.helpTabActive]}><Icon size={17} color={topic === key ? colors.primary : colors.muted} /><Text style={[s.helpTabText, topic === key && { color: colors.primary }]}>{label}</Text></Pressable>
+          ))}
+        </View>
+        <View style={s.helpGuide}><Text style={s.cardTitle}>{topics[topic][0]}</Text>{topics[topic][1].map((text, index) => <View key={text} style={s.guideRow}><View style={s.guideNumber}><Text style={s.guideNumberText}>{index + 1}</Text></View><Text style={s.guideText}>{text}</Text></View>)}</View>
+        <Text style={s.billingSectionTitle}>Contact and feedback</Text>
+        <Pressable style={s.helpAction} onPress={() => navigation.navigate("Feedback", { type: "bug" })}><View style={s.helpActionIcon}><MessageSquare color={colors.danger} size={20} /></View><View style={{ flex: 1 }}><Text style={s.value}>Report a problem</Text><Text style={s.small}>Tell us what happened and how to reproduce it.</Text></View><ChevronDown color={colors.muted} size={17} style={{ transform: [{ rotate: "-90deg" }] }} /></Pressable>
+        <Pressable style={s.helpAction} onPress={() => navigation.navigate("Feedback", { type: "feature" })}><View style={s.helpActionIcon}><Lightbulb color={colors.warning} size={20} /></View><View style={{ flex: 1 }}><Text style={s.value}>Request a feature</Text><Text style={s.small}>Share an idea that would improve your workflow.</Text></View><ChevronDown color={colors.muted} size={17} style={{ transform: [{ rotate: "-90deg" }] }} /></Pressable>
+        <Text style={s.billingSectionTitle}>About</Text>
+        <View style={s.aboutCard}>
+          <Image source={require("./assets/icon-2.png")} resizeMode="contain" style={s.aboutLogo} />
+          <Text style={s.aboutTitle}>EchoNotes</Text><Text style={s.aboutVersion}>Mobile beta · Version 0.1.0</Text>
+          <Text style={s.aboutText}>EchoNotes is a focused, offline-first personal notes workspace built by Echo8V. It gives everyone a simple writing experience while still supporting Markdown, live preview, folders, tags, public links, PDF export and secure cross-device sync.</Text>
+          <View style={s.aboutStatus}><View style={s.aboutStatusRow}><Text style={s.small}>Local-first storage</Text><Text style={s.aboutEnabled}>Enabled</Text></View><View style={s.aboutStatusRow}><Text style={s.small}>Markdown live preview</Text><Text style={s.aboutEnabled}>Enabled</Text></View><View style={s.aboutStatusRow}><Text style={s.small}>Cloud sync</Text><Text style={s.value}>Supabase</Text></View><View style={s.aboutStatusRow}><Text style={s.small}>Payments</Text><Text style={s.value}>Paystack</Text></View></View>
+          <View style={s.aboutPromise}><ShieldCheck color={colors.success} size={18} /><Text style={s.small}>Your notes stay on your device first and only sync to your account when you sign in.</Text></View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -1500,13 +1514,12 @@ function Feedback({ route, navigation }) {
   const user = useAuthStore((x) => x.session?.user);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState(null);
   const type = route.params.type;
   async function submit() {
-    if (!user)
-      return Alert.alert(
-        "Sign in required",
-        "Sign in before sending feedback.",
-      );
+    if (!user) return setNotice({ title: "Sign in required", message: "Sign in before sending feedback. Your text will remain on this screen." });
+    setBusy(true);
     const { error } = await supabase.from("feedback_submissions").insert({
       user_id: user.id,
       type,
@@ -1515,11 +1528,9 @@ function Feedback({ route, navigation }) {
       user_agent: `EchoNotes mobile ${Platform.OS}`,
       page_url: "mobile://settings/help",
     });
-    if (error) Alert.alert("Could not send", error.message);
-    else {
-      Alert.alert("Thank you", "Your feedback was submitted.");
-      navigation.goBack();
-    }
+    setBusy(false);
+    if (error) setNotice({ title: "Could not send", message: error.message });
+    else setNotice({ title: type === "bug" ? "Problem reported" : "Feature requested", message: "Thanks—your feedback was received successfully.", success: true });
   }
   return (
     <SafeAreaView style={s.page}>
@@ -1528,14 +1539,18 @@ function Feedback({ route, navigation }) {
         back
         navigation={navigation}
       />
-      <View style={s.pad}>
+      <ScrollView contentContainerStyle={s.feedbackContent} keyboardShouldPersistTaps="handled">
+        <View style={s.feedbackHero}><View style={s.feedbackHeroIcon}>{type === "bug" ? <AlertCircle color={colors.danger} size={25} /> : <Lightbulb color={colors.warning} size={25} />}</View><Text style={s.feedbackTitle}>{type === "bug" ? "Help us fix it" : "Help shape EchoNotes"}</Text><Text style={s.dialogText}>{type === "bug" ? "Describe what happened, what you expected and the steps that caused it." : "Explain what you want EchoNotes to do and how it would improve your workflow."}</Text></View>
+        <Text style={s.fieldLabel}>TITLE</Text>
         <TextInput
           style={s.input}
           value={title}
+          maxLength={120}
           onChangeText={setTitle}
-          placeholder="Short title"
+          placeholder={type === "bug" ? "Example: Note does not save" : "Example: Add calendar view"}
           placeholderTextColor={colors.muted}
         />
+        <Text style={s.fieldLabel}>DETAILS</Text>
         <TextInput
           style={[
             s.input,
@@ -1543,17 +1558,20 @@ function Feedback({ route, navigation }) {
           ]}
           multiline
           value={description}
+          maxLength={5000}
           onChangeText={setDescription}
-          placeholder="Tell us the details…"
+          placeholder={type === "bug" ? "What happened? What did you expect? How can we reproduce it?" : "What should EchoNotes do, and how would it help you?"}
           placeholderTextColor={colors.muted}
         />
+        <View style={s.feedbackMeta}><Text style={s.small}>Technical app details are included automatically.</Text><Text style={s.small}>{description.length}/5000</Text></View>
         <Button
-          disabled={title.trim().length < 3 || description.trim().length < 10}
+          disabled={busy || title.trim().length < 3 || description.trim().length < 10}
           onPress={submit}
         >
-          Submit
+          {busy ? "Submitting…" : user ? "Submit feedback" : "Sign in to submit"}
         </Button>
-      </View>
+      </ScrollView>
+      <Modal transparent visible={!!notice} animationType="fade" onRequestClose={() => setNotice(null)}><Pressable style={s.dialogShade} onPress={() => setNotice(null)}><Pressable style={s.noticeDialog} onPress={(event) => event.stopPropagation()}><View style={s.dialogIcon}>{notice?.success ? <Check color={colors.success} size={27} /> : <AlertCircle color={colors.danger} size={27} />}</View><Text style={s.dialogTitle}>{notice?.title}</Text><Text style={s.dialogText}>{notice?.message}</Text><Button onPress={() => { const done = notice?.success; setNotice(null); if (done) navigation.goBack(); }}>Okay</Button></Pressable></Pressable></Modal>
     </SafeAreaView>
   );
 }
@@ -1614,9 +1632,12 @@ function AppContent() {
   const { navigationTheme, statusBarStyle } = useAppTheme();
   s = createStyles();
   const ready = useAuthStore((x) => x.ready);
+  const preferencesReady = usePreferences((x) => x.ready);
   const session = useAuthStore((x) => x.session);
   const pending = useAuthStore((x) => x.pendingMerge);
   const merge = useAuthStore((x) => x.mergeGuest);
+  const [showSplash, setShowSplash] = useState(true);
+  const splashOpacity = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     let auth;
     void usePreferences.getState().initialize();
@@ -1626,6 +1647,17 @@ function AppContent() {
       .then((x) => (auth = x));
     return () => auth?.unsubscribe();
   }, []);
+  useEffect(() => {
+    if (!ready || !preferencesReady) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      Animated.timing(splashOpacity, { toValue: 0, duration: 280, useNativeDriver: true }).start(() => {
+        if (!cancelled) setShowSplash(false);
+      });
+    }, 650);
+    requestAnimationFrame(() => void ExpoSplashScreen.hideAsync().catch(() => {}));
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [ready, preferencesReady, splashOpacity]);
   useEffect(() => {
     if (!ready) return;
     const id = session?.user?.id ?? "guest";
@@ -1666,12 +1698,8 @@ function AppContent() {
         ],
       );
   }, [pending]);
-  if (!ready)
-    return (
-      <View style={s.loading}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
+  if (!ready || !preferencesReady || showSplash)
+    return <ThemedSplash opacity={splashOpacity} statusBarStyle={statusBarStyle} />;
   return (
     <SafeAreaProvider>
       <StatusBar
@@ -1701,6 +1729,22 @@ function AppContent() {
   );
 }
 
+function ThemedSplash({ opacity, statusBarStyle }) {
+  return (
+    <Animated.View style={[s.splashPage, { opacity }]}>
+      <StatusBar style={statusBarStyle} backgroundColor={colors.background} translucent={false} />
+      <View style={s.splashGlow} />
+      <View style={s.splashLogoWrap}>
+        <Image source={require("./assets/icon-2.png")} resizeMode="contain" style={s.splashLogo} />
+      </View>
+      <Text style={s.splashTitle}>EchoNotes</Text>
+      <Text style={s.splashTagline}>Your thoughts, organized.</Text>
+      <View style={s.splashTrack}><View style={s.splashProgress} /></View>
+      <Text style={s.splashFoot}>OFFLINE-FIRST · PRIVATE · YOURS</Text>
+    </Animated.View>
+  );
+}
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -1716,6 +1760,15 @@ const createStyles = () =>
       justifyContent: "center",
       backgroundColor: colors.background,
     },
+    splashPage: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background, overflow: "hidden" },
+    splashGlow: { position: "absolute", width: 310, height: 310, borderRadius: 155, backgroundColor: colors.primarySoft, opacity: 0.7 },
+    splashLogoWrap: { width: 112, height: 112, borderRadius: 30, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary + "55", elevation: 8 },
+    splashLogo: { width: 88, height: 88 },
+    splashTitle: { color: colors.text, fontSize: 31, fontWeight: "900", letterSpacing: -0.8, marginTop: 22 },
+    splashTagline: { color: colors.muted, fontSize: 14, marginTop: 7 },
+    splashTrack: { width: 126, height: 4, borderRadius: 4, backgroundColor: colors.raised, overflow: "hidden", marginTop: 32 },
+    splashProgress: { width: "72%", height: 4, borderRadius: 4, backgroundColor: colors.primary },
+    splashFoot: { position: "absolute", bottom: 42, color: colors.muted, fontSize: 9, fontWeight: "800", letterSpacing: 1.5 },
     page: { flex: 1, backgroundColor: colors.background },
     header: {
       height: 92,
@@ -2224,6 +2277,35 @@ const createStyles = () =>
       marginBottom: 5,
     },
     saveBadgeText: { color: "white", fontSize: 8, fontWeight: "900" },
+    helpHero: { flexDirection: "row", alignItems: "center", gap: 14, borderRadius: 20, borderWidth: 1, borderColor: colors.primary + "44", backgroundColor: colors.primarySoft, padding: 16 },
+    helpLogo: { width: 58, height: 58 },
+    helpHeroTitle: { color: colors.text, fontSize: 21, fontWeight: "900", marginBottom: 4 },
+    helpTabs: { flexDirection: "row", gap: 8 },
+    helpTab: { flex: 1, minHeight: 52, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+    helpTabActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+    helpTabText: { color: colors.muted, fontSize: 12, fontWeight: "800" },
+    helpGuide: { marginTop: 10, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: 16 },
+    guideRow: { flexDirection: "row", alignItems: "flex-start", gap: 11, marginTop: 14 },
+    guideNumber: { width: 23, height: 23, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.primarySoft },
+    guideNumberText: { color: colors.primary, fontSize: 11, fontWeight: "900" },
+    guideText: { flex: 1, color: colors.muted, fontSize: 13, lineHeight: 20 },
+    helpAction: { minHeight: 76, flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 17, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: 14, marginBottom: 10 },
+    helpActionIcon: { width: 40, height: 40, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: colors.raised },
+    aboutCard: { alignItems: "center", borderRadius: 22, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: 20 },
+    aboutLogo: { width: 82, height: 82 },
+    aboutTitle: { color: colors.text, fontSize: 23, fontWeight: "900", marginTop: 10 },
+    aboutVersion: { color: colors.muted, fontSize: 11, marginTop: 3 },
+    aboutText: { color: colors.muted, fontSize: 13, lineHeight: 21, textAlign: "center", marginTop: 16 },
+    aboutStatus: { width: "100%", borderRadius: 15, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.raised, paddingHorizontal: 14, marginTop: 17 },
+    aboutStatusRow: { minHeight: 45, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: colors.border },
+    aboutEnabled: { color: colors.success, fontSize: 12, fontWeight: "800" },
+    aboutPromise: { width: "100%", flexDirection: "row", alignItems: "flex-start", gap: 9, borderRadius: 13, backgroundColor: colors.success + "12", padding: 12, marginTop: 14 },
+    feedbackContent: { padding: 18, paddingBottom: 80 },
+    feedbackHero: { alignItems: "center", borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: 18, marginBottom: 20 },
+    feedbackHeroIcon: { width: 52, height: 52, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: colors.raised, marginBottom: 11 },
+    feedbackTitle: { color: colors.text, fontSize: 21, fontWeight: "900" },
+    fieldLabel: { color: colors.muted, fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginTop: 13, marginBottom: 7 },
+    feedbackMeta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 8 },
     tabs: {
       flexGrow: 0,
       height: 43,
