@@ -1348,6 +1348,13 @@ function Billing({ navigation }) {
                     : "Sync up to 5 devices on Pro"
                 }
               />
+              <PlanFeature
+                text={
+                  data.plan === "pro"
+                    ? "Encrypted Nearby Clipboard Sync"
+                    : "Encrypted Nearby Clipboard Sync on Pro"
+                }
+              />
             </View>
             <Button disabled={busy} onPress={() => data.plan === "pro" ? void runBilling("manage") : openPlanChoice()}>
               {busy ? "Opening secure billing…" : data.plan === "pro"

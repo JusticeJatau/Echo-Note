@@ -257,7 +257,7 @@ function UpgradePanel() {
   const [interval, setInterval] = useState("monthly");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const rows = [["Cloud-synced notes", "100", "Unlimited"], ["Synced devices", "2", "5"], ["Public share links", "3", "Unlimited"], ["Offline notes and editor", "Included", "Included"], ["Folders, tags and search", "Included", "Included"], ["Markdown, Live Preview and PDF", "Included", "Included"]];
+  const rows = [["Cloud-synced notes", "100", "Unlimited"], ["Synced devices", "2", "5"], ["Public share links", "3", "Unlimited"], ["Nearby Clipboard Sync", "Pro only", "Included"], ["Offline notes and editor", "Included", "Included"], ["Folders, tags and search", "Included", "Included"], ["Markdown, Live Preview and PDF", "Included", "Included"]];
   async function checkout() {
     if (!user) return window.location.assign("/login");
     setBusy(true); setError("");
