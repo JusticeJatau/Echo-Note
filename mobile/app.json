@@ -37,6 +37,13 @@
       "expo-sqlite",
       "expo-document-picker",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow EchoNotes to scan pairing codes from EchoNotes Desktop Bridge.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#f7f7fb",
@@ -46,6 +53,14 @@
           "dark": {
             "backgroundColor": "#090b10",
             "image": "./assets/splash-icon-2.png"
+          }
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
           }
         }
       ]

@@ -36,6 +36,8 @@ export async function getDatabase() {
     CREATE INDEX IF NOT EXISTS operations_owner_created_idx ON operations(owner_id, created_at);
     CREATE TABLE IF NOT EXISTS preferences (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS alerts (id TEXT PRIMARY KEY NOT NULL, owner_id TEXT NOT NULL, type TEXT NOT NULL, title TEXT NOT NULL, message TEXT NOT NULL, read INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS clipboard_history (id TEXT PRIMARY KEY NOT NULL, content TEXT NOT NULL, source_id TEXT NOT NULL, source_name TEXT NOT NULL, direction TEXT NOT NULL, created_at TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS clipboard_history_created_idx ON clipboard_history(created_at DESC);
   `);
   const operationColumns = await database.getAllAsync("PRAGMA table_info(operations)");
   if (!operationColumns.some((column) => column.name === "last_error")) await database.execAsync("ALTER TABLE operations ADD COLUMN last_error TEXT");

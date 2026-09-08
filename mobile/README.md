@@ -22,6 +22,29 @@ Never put `SUPABASE_SERVICE_ROLE_KEY` or `PAYSTACK_SECRET_KEY` in the mobile `.e
 - PDF, Markdown and text export; Markdown/text import; native sharing and public read-only links
 - Alerts, help, bug reports, feature requests, profile settings and functional editor preferences
 - Basic/Pro overview, secure Paystack web handoff, device registration, plan limits, and device removal
+- Encrypted nearby clipboard pairing and text transfer with EchoNotes Desktop Bridge over local Wi-Fi or hotspot
+
+## Nearby clipboard
+
+Nearby clipboard does not use Supabase or require internet. Install and open the
+Windows bridge, select **Pair a device**, then open **Settings → Nearby clipboard
+sync → Scan PC QR** on Android. Compare the six-digit code and approve the phone
+on the PC.
+
+The feature uses X25519 pairing, HMAC-SHA256 reconnection and
+ChaCha20-Poly1305-encrypted clipboard messages. Trusted keys are kept in Android
+secure storage and recent transfers are kept in the local SQLite database.
+
+Android clipboard monitoring and the WebSocket connection remain active while
+EchoNotes is in the foreground. Android may suspend both after the app enters the
+background; reopen EchoNotes to reconnect automatically.
+
+Because this version adds `expo-camera` and Android local-network build
+configuration, create a new EAS build before testing the installed APK:
+
+```bash
+eas build --platform android --profile preview
+```
 
 ## Supabase
 

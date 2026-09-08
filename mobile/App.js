@@ -80,6 +80,8 @@ import { useAlerts } from "./src/store/alerts";
 import { NotesList } from "./src/components/NotesList";
 import { MarkdownPreview } from "./src/components/MarkdownPreview";
 import { LiveLineEditor } from "./src/components/LiveLineEditor";
+import { NearbyClipboardScreen } from "./src/components/NearbyClipboardScreen";
+import { NearbyClipboardProvider } from "./src/clipboard/NearbyClipboardProvider";
 import { colors } from "./src/theme";
 import { ThemeProvider, useAppTheme } from "./src/theme/ThemeProvider";
 import { startAutoSync, syncNow } from "./src/lib/sync";
@@ -1111,81 +1113,7 @@ function SettingsScreen({ navigation }) {
 }
 
 function ClipboardSync({ navigation }) {
-  useScreenTheme();
-  const [notice, setNotice] = useState(false);
-  const comingSoon = () => setNotice(true);
-  return (
-    <SafeAreaView style={s.page}>
-      <Header title="Clipboard sync" back navigation={navigation} />
-      <ScrollView contentContainerStyle={s.clipboardContent} showsVerticalScrollIndicator={false}>
-        <View style={s.clipboardHero}>
-          <View style={s.clipboardHeroIcon}><Copy color={colors.primary} size={29} /></View>
-          <View style={s.clipboardBadge}><Radio color={colors.primary} size={12} /><Text style={s.clipboardBadgeText}>COMING SOON</Text></View>
-          <Text style={s.clipboardTitle}>Copy here. Paste there.</Text>
-          <Text style={s.clipboardLead}>Share text, links and code directly between your Android phones and Windows PC—even through a hotspot with no internet.</Text>
-        </View>
-
-        <View style={s.clipboardStatus}>
-          <View style={s.clipboardStatusDot} />
-          <View style={{ flex: 1 }}><Text style={s.value}>Nearby sync is not connected</Text><Text style={s.small}>Your clipboard remains private on this device.</Text></View>
-          <Text style={s.clipboardLocal}>OFFLINE</Text>
-        </View>
-
-        <Text style={s.billingSectionTitle}>Pair a device</Text>
-        <View style={s.clipboardActions}>
-          <Pressable style={s.clipboardAction} onPress={comingSoon}>
-            <View style={s.clipboardActionIcon}><ScanLine color={colors.primary} size={24} /></View>
-            <Text style={s.clipboardActionTitle}>Scan QR</Text>
-            <Text style={s.clipboardActionText}>Scan the code shown on another EchoNotes device.</Text>
-          </Pressable>
-          <Pressable style={s.clipboardAction} onPress={comingSoon}>
-            <View style={s.clipboardActionIcon}><QrCode color={colors.primary} size={24} /></View>
-            <Text style={s.clipboardActionTitle}>Show my QR</Text>
-            <Text style={s.clipboardActionText}>Let another phone or PC pair with this device.</Text>
-          </Pressable>
-        </View>
-
-        <Text style={s.billingSectionTitle}>Works without internet</Text>
-        <View style={s.connectionMethods}>
-          <ConnectionMethod icon={Wifi} title="Same Wi-Fi" text="Connect both devices to one local network." />
-          <ConnectionMethod icon={Smartphone} title="Phone hotspot" text="One phone creates a hotspot and the other device joins it." />
-          <ConnectionMethod icon={Laptop} title="PC hotspot" text="Share directly while your phone is connected to the PC hotspot." />
-        </View>
-
-        <Text style={s.billingSectionTitle}>Trusted devices</Text>
-        <View style={s.clipboardEmpty}>
-          <Laptop color={colors.muted} size={28} />
-          <Text style={s.clipboardEmptyTitle}>No paired devices yet</Text>
-          <Text style={s.small}>Paired phones and computers will appear here with controls to pause or remove access.</Text>
-        </View>
-
-        <Text style={s.billingSectionTitle}>Recent clipboard</Text>
-        <View style={s.clipboardEmpty}>
-          <Copy color={colors.muted} size={28} />
-          <Text style={s.clipboardEmptyTitle}>Nothing received yet</Text>
-          <Text style={s.small}>Recent text, links and code from trusted devices will stay locally on this phone.</Text>
-          <Pressable style={s.clipboardSecondaryButton} onPress={comingSoon}><Send color={colors.primary} size={16} /><Text style={s.clipboardSecondaryText}>Paste and send</Text></Pressable>
-        </View>
-
-        <View style={s.clipboardPrivacy}>
-          <ShieldCheck color={colors.success} size={21} />
-          <View style={{ flex: 1 }}><Text style={s.value}>Private by design</Text><Text style={s.small}>Nearby transfers will be encrypted and sent directly between paired devices. Supabase and the internet are not involved.</Text></View>
-        </View>
-        <Button onPress={comingSoon}>Start nearby connection</Button>
-      </ScrollView>
-
-      <Modal transparent visible={notice} animationType="fade" onRequestClose={() => setNotice(false)}>
-        <Pressable style={s.dialogShade} onPress={() => setNotice(false)}>
-          <Pressable style={s.noticeDialog} onPress={(event) => event.stopPropagation()}>
-            <View style={s.dialogIcon}><Radio color={colors.primary} size={27} /></View>
-            <Text style={s.dialogTitle}>Nearby Clipboard is coming soon</Text>
-            <Text style={s.dialogText}>The complete interface is ready, but device pairing and transfers are not enabled in this release yet.</Text>
-            <Button onPress={() => setNotice(false)}>Got it</Button>
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </SafeAreaView>
-  );
+  return <NearbyClipboardScreen navigation={navigation} />;
 }
 
 function ConnectionMethod({ icon: Icon, title, text }) {
@@ -1843,7 +1771,9 @@ function ThemedSplash({ opacity, statusBarStyle }) {
 export default function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      <NearbyClipboardProvider>
+        <AppContent />
+      </NearbyClipboardProvider>
     </ThemeProvider>
   );
 }
