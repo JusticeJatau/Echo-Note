@@ -49,11 +49,20 @@ export async function listClipboardHistory() {
 
 export async function saveClipboardHistory(item, limit) {
   const db = await getDatabase();
+  const safeItem = {
+    id: String(item.id || Crypto.randomUUID()),
+    content: String(item.content ?? ""),
+    sourceId: String(item.sourceId || "unknown-device"),
+    sourceName: String(item.sourceName || "Unknown device"),
+    direction: item.direction === "received" ? "received" : "sent",
+    createdAt: String(item.createdAt || new Date().toISOString()),
+  };
+  const safeLimit = Number.isFinite(Number(limit)) ? Math.max(1, Math.trunc(Number(limit))) : clipboardDefaults.historyLimit;
   await db.runAsync(
     "INSERT OR REPLACE INTO clipboard_history (id,content,source_id,source_name,direction,created_at) VALUES (?,?,?,?,?,?)",
-    item.id, item.content, item.sourceId, item.sourceName, item.direction, item.createdAt,
+    safeItem.id, safeItem.content, safeItem.sourceId, safeItem.sourceName, safeItem.direction, safeItem.createdAt,
   );
-  await db.runAsync("DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY created_at DESC LIMIT ?)", Math.max(1, limit));
+  await db.runAsync("DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY created_at DESC LIMIT ?)", safeLimit);
 }
 
 export async function deleteClipboardHistory(id) {

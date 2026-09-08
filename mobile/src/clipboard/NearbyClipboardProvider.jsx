@@ -4,6 +4,9 @@ import * as Clipboard from "expo-clipboard";
 import * as Crypto from "expo-crypto";
 import { utf8ToBytes } from "@noble/hashes/utils";
 import { useAlerts } from "../store/alerts";
+import { useAuthStore } from "../store/auth";
+import { billingOverview } from "../lib/billing";
+import { getPreference, setPreference } from "../db/database";
 import {
   authProof, confirmationCode, decryptClipboard, encryptClipboard, fromBase64, sharedKeyFor, toBase64,
 } from "./crypto";
@@ -16,6 +19,7 @@ import {
 const NearbyClipboardContext = createContext(null);
 const PROTOCOL = "echonotes-nearby-v1";
 const MAX_BYTES = 100 * 1024;
+const ENTITLEMENT_KEY = "nearby-clipboard-pro-v1";
 const utf8Length = (value) => utf8ToBytes(value).length;
 const readableError = (error) => error instanceof Error ? error.message : String(error);
 
@@ -28,6 +32,7 @@ function parsePairingPayload(raw) {
 }
 
 export function NearbyClipboardProvider({ children }) {
+  const session = useAuthStore((state) => state.session);
   const [ready, setReady] = useState(false);
   const [identity, setIdentity] = useState(null);
   const [peers, setPeers] = useState([]);
@@ -35,6 +40,7 @@ export function NearbyClipboardProvider({ children }) {
   const [settings, setSettings] = useState(clipboardDefaults);
   const [status, setStatus] = useState({ state: "offline", message: "No trusted PC connected" });
   const [pairing, setPairing] = useState(null);
+  const [entitlement, setEntitlement] = useState({ ready: false, isPro: false });
   const socketRef = useRef(null);
   const activePeerRef = useRef(null);
   const reconnectRef = useRef(null);
@@ -43,6 +49,7 @@ export function NearbyClipboardProvider({ children }) {
   const peersRef = useRef(peers);
   const identityRef = useRef(identity);
   const lastClipboardRef = useRef("");
+  const entitlementRef = useRef(false);
 
   useEffect(() => { settingsRef.current = settings; }, [settings]);
   useEffect(() => { peersRef.current = peers; }, [peers]);
@@ -105,6 +112,7 @@ export function NearbyClipboardProvider({ children }) {
 
   const connectTrusted = useCallback((peer) => {
     const currentIdentity = identityRef.current;
+    if (!entitlementRef.current) return;
     if (!currentIdentity || !settingsRef.current.enabled) return;
     closeSocket(false);
     manualCloseRef.current = false;
@@ -135,6 +143,38 @@ export function NearbyClipboardProvider({ children }) {
 
   useEffect(() => {
     let alive = true;
+    const userId = session?.user?.id;
+    if (!userId) {
+      entitlementRef.current = false;
+      setEntitlement({ ready: true, isPro: false });
+      closeSocket(true);
+      return () => { alive = false; };
+    }
+    setEntitlement((current) => ({ ...current, ready: false }));
+    void getPreference(`${ENTITLEMENT_KEY}:${userId}`, false).then((cached) => {
+      if (!alive) return;
+      const isPro = cached === true;
+      entitlementRef.current = isPro;
+      setEntitlement({ ready: true, isPro });
+      if (isPro && settingsRef.current.enabled && peersRef.current[0]) connectTrustedRef.current(peersRef.current[0]);
+    }).catch(() => {});
+    void billingOverview(userId).then(async (overview) => {
+      if (!alive) return;
+      const isPro = overview.plan === "pro";
+      entitlementRef.current = isPro;
+      setEntitlement({ ready: true, isPro });
+      await setPreference(`${ENTITLEMENT_KEY}:${userId}`, isPro);
+      if (!isPro) closeSocket(true);
+      else if (settingsRef.current.enabled && peersRef.current[0]) connectTrustedRef.current(peersRef.current[0]);
+    }).catch(() => {
+      // Offline: retain the last entitlement confirmed by the billing server.
+      if (alive) setEntitlement((current) => ({ ...current, ready: true }));
+    });
+    return () => { alive = false; };
+  }, [session?.user?.id, closeSocket]);
+
+  useEffect(() => {
+    let alive = true;
     void Promise.all([loadIdentity(), loadPeers(), listClipboardHistory(), loadClipboardSettings()]).then(([nextIdentity, nextPeers, nextHistory, nextSettings]) => {
       if (!alive) return;
       setIdentity(nextIdentity); identityRef.current = nextIdentity;
@@ -155,7 +195,7 @@ export function NearbyClipboardProvider({ children }) {
     const subscription = Clipboard.addClipboardListener(({ contentTypes }) => {
       if (!contentTypes.includes(Clipboard.ContentType.PLAIN_TEXT)) return;
       void Clipboard.getStringAsync().then((content) => {
-        if (!settingsRef.current.enabled || !settingsRef.current.autoSend || !content || content === lastClipboardRef.current) return;
+      if (!entitlementRef.current || !settingsRef.current.enabled || !settingsRef.current.autoSend || !content || content === lastClipboardRef.current) return;
         lastClipboardRef.current = content;
         void sendTextRef.current(content, true);
       });
@@ -174,6 +214,7 @@ export function NearbyClipboardProvider({ children }) {
   }, []);
 
   const pairFromQr = useCallback(async (raw) => {
+    if (!entitlementRef.current) throw new Error("Upgrade to EchoNotes Pro to use Clipboard Sync.");
     if (!identityRef.current) throw new Error("The mobile identity is still loading.");
     const payload = parsePairingPayload(raw);
     closeSocket(false);
@@ -183,6 +224,7 @@ export function NearbyClipboardProvider({ children }) {
     setPairing({ state: "connecting", peer, code: null });
     setStatus({ state: "connecting", message: `Pairing with ${peer.name}…` });
     const socket = new WebSocket(`ws://${payload.endpoint}/pair?token=${encodeURIComponent(payload.token)}`);
+    let pairingApproved = false;
     socketRef.current = socket;
     socket.onopen = () => socket.send(JSON.stringify({ type: "pair_request", deviceId: identityRef.current.id, deviceName: identityRef.current.name, deviceKind: "android", publicKey: identityRef.current.publicKey }));
     socket.onmessage = async (event) => {
@@ -194,9 +236,17 @@ export function NearbyClipboardProvider({ children }) {
         } else if (message.type === "pair_approved") {
           const trusted = { ...peer, sharedKey: toBase64(key), lastSeen: new Date().toISOString() };
           const nextPeers = [trusted, ...peersRef.current.filter((item) => item.id !== trusted.id)];
-          peersRef.current = nextPeers; setPeers(nextPeers); await savePeers(nextPeers);
+          // Make approval final before touching storage. On Android, WebSocket
+          // may emit an error while an async handler is awaiting SQLite; the
+          // old pairing error handler must not overwrite a successful pairing.
+          pairingApproved = true;
+          peersRef.current = nextPeers;
+          setPeers(nextPeers);
           setPairing({ state: "approved", peer: trusted, code: null });
           attachConnectedSocket(socket, trusted, key);
+          void savePeers(nextPeers).catch((error) => {
+            setStatus({ state: "error", message: `PC connected, but saving it failed: ${readableError(error)}` });
+          });
         } else if (message.type === "pair_rejected" || message.type === "error") {
           throw new Error(message.message || "Pairing was rejected on the PC.");
         }
@@ -207,12 +257,17 @@ export function NearbyClipboardProvider({ children }) {
       }
     };
     socket.onerror = () => {
+      if (pairingApproved) return;
       const message = "Could not reach the PC. Keep both devices on the same Wi-Fi or hotspot and allow the bridge through Windows Firewall.";
       setPairing({ state: "error", peer, error: message }); setStatus({ state: "error", message });
     };
   }, [attachConnectedSocket, closeSocket]);
 
   const sendText = useCallback(async (content, automatic = false) => {
+    if (!entitlementRef.current) {
+      if (automatic) return false;
+      throw new Error("Upgrade to EchoNotes Pro to use Clipboard Sync.");
+    }
     const socket = socketRef.current;
     const peer = activePeerRef.current;
     const currentIdentity = identityRef.current;
@@ -224,7 +279,13 @@ export function NearbyClipboardProvider({ children }) {
     }
     const wire = { type: "clipboard", id: Crypto.randomUUID(), content, sourceId: currentIdentity.id, sourceName: currentIdentity.name, createdAt: new Date().toISOString() };
     socket.send(encryptClipboard(fromBase64(peer.sharedKey), wire));
-    await rememberItem({ ...wire, direction: "sent" });
+    try {
+      await rememberItem({ ...wire, direction: "sent" });
+    } catch (error) {
+      // The encrypted payload has already left the phone. A local history
+      // failure must not tell the user that the clipboard transfer failed.
+      console.warn("Clipboard sent, but local history could not be saved", error);
+    }
     return true;
   }, [rememberItem]);
   const sendTextRef = useRef(sendText);
@@ -241,6 +302,7 @@ export function NearbyClipboardProvider({ children }) {
     setStatus({ state: "offline", message: next.length ? "Choose a trusted PC to reconnect" : "No trusted PC connected" });
   }, [closeSocket]);
   const updateSettings = useCallback(async (patch) => {
+    if (!entitlementRef.current) throw new Error("Upgrade to EchoNotes Pro to use Clipboard Sync.");
     const next = { ...settingsRef.current, ...patch };
     settingsRef.current = next; setSettings(next); await saveClipboardSettings(next);
     if (!next.enabled) { closeSocket(true); setStatus({ state: "paused", message: "Nearby clipboard is paused" }); }
@@ -248,7 +310,7 @@ export function NearbyClipboardProvider({ children }) {
   }, [closeSocket]);
 
   const value = {
-    ready, identity, peers, history, settings, status, pairing, setPairing,
+    ready, identity, peers, history, settings, status, pairing, setPairing, entitlement,
     pairFromQr, connectPeer: connectTrusted, disconnect: () => { closeSocket(true); setStatus({ state: "offline", message: "Disconnected" }); },
     sendCurrentClipboard, copyItem, removeHistory, clearHistory, removePeer, updateSettings,
   };

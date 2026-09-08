@@ -1,32 +1,45 @@
 import * as SQLite from "expo-sqlite";
 
 let database;
+let databasePromise;
 const bool = (value) => value ? 1 : 0;
 const parse = (value, fallback) => { try { return JSON.parse(value); } catch { return fallback; } };
 const noteFromRow = (row) => ({ ...row, tags: parse(row.tags_json, []), is_favorite: !!row.is_favorite, is_archived: !!row.is_archived, is_deleted: !!row.is_deleted, is_system: !!row.is_system });
 
 export async function getDatabase() {
   if (database) return database;
-  database = await SQLite.openDatabaseAsync("echonotes.db");
-  const oldNotes = await database.getAllAsync("PRAGMA table_info(notes)");
+  if (databasePromise) return databasePromise;
+
+  databasePromise = initializeDatabase();
+  try {
+    return await databasePromise;
+  } catch (error) {
+    databasePromise = null;
+    throw error;
+  }
+}
+
+async function initializeDatabase() {
+  const nextDatabase = await SQLite.openDatabaseAsync("echonotes.db");
+  const oldNotes = await nextDatabase.getAllAsync("PRAGMA table_info(notes)");
   if (oldNotes.length && !oldNotes.some((column) => column.name === "owner_id" && column.pk === 2)) {
-    await database.execAsync(`
+    await nextDatabase.execAsync(`
       ALTER TABLE notes RENAME TO notes_legacy;
       CREATE TABLE notes (id TEXT NOT NULL, owner_id TEXT NOT NULL, folder_id TEXT, title TEXT NOT NULL, content TEXT NOT NULL, tags_json TEXT NOT NULL DEFAULT '[]', is_favorite INTEGER NOT NULL DEFAULT 0, is_archived INTEGER NOT NULL DEFAULT 0, is_deleted INTEGER NOT NULL DEFAULT 0, is_system INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, dirty INTEGER NOT NULL DEFAULT 1, PRIMARY KEY (id, owner_id));
       INSERT INTO notes (id,owner_id,folder_id,title,content,tags_json,is_favorite,is_archived,is_deleted,is_system,created_at,updated_at,dirty) SELECT id,owner_id,folder_id,title,content,tags_json,is_favorite,is_archived,is_deleted,0,created_at,updated_at,dirty FROM notes_legacy;
       DROP TABLE notes_legacy;
     `);
   }
-  const oldFolders = await database.getAllAsync("PRAGMA table_info(folders)");
+  const oldFolders = await nextDatabase.getAllAsync("PRAGMA table_info(folders)");
   if (oldFolders.length && !oldFolders.some((column) => column.name === "owner_id" && column.pk === 2)) {
-    await database.execAsync(`
+    await nextDatabase.execAsync(`
       ALTER TABLE folders RENAME TO folders_legacy;
       CREATE TABLE folders (id TEXT NOT NULL, owner_id TEXT NOT NULL, name TEXT NOT NULL, color TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, dirty INTEGER NOT NULL DEFAULT 1, PRIMARY KEY (id, owner_id));
       INSERT INTO folders SELECT id,owner_id,name,color,created_at,updated_at,dirty FROM folders_legacy;
       DROP TABLE folders_legacy;
     `);
   }
-  await database.execAsync(`
+  await nextDatabase.execAsync(`
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
     CREATE TABLE IF NOT EXISTS folders (id TEXT NOT NULL, owner_id TEXT NOT NULL, name TEXT NOT NULL, color TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, dirty INTEGER NOT NULL DEFAULT 1, PRIMARY KEY (id, owner_id));
@@ -39,8 +52,9 @@ export async function getDatabase() {
     CREATE TABLE IF NOT EXISTS clipboard_history (id TEXT PRIMARY KEY NOT NULL, content TEXT NOT NULL, source_id TEXT NOT NULL, source_name TEXT NOT NULL, direction TEXT NOT NULL, created_at TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS clipboard_history_created_idx ON clipboard_history(created_at DESC);
   `);
-  const operationColumns = await database.getAllAsync("PRAGMA table_info(operations)");
-  if (!operationColumns.some((column) => column.name === "last_error")) await database.execAsync("ALTER TABLE operations ADD COLUMN last_error TEXT");
+  const operationColumns = await nextDatabase.getAllAsync("PRAGMA table_info(operations)");
+  if (!operationColumns.some((column) => column.name === "last_error")) await nextDatabase.execAsync("ALTER TABLE operations ADD COLUMN last_error TEXT");
+  database = nextDatabase;
   return database;
 }
 
