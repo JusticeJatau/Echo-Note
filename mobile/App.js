@@ -108,9 +108,9 @@ function useScreenTheme() {
 }
 const owner = () => useAuthStore.getState().session?.user?.id ?? "guest";
 
-function Header({ title, back, navigation, right, center }) {
+function Header({ title, back, navigation, right, center, compact = false }) {
   return (
-    <SafeAreaView edges={["top"]} style={s.header}>
+    <SafeAreaView edges={["top"]} style={[s.header, compact && s.compactHeader]}>
       {back ? (
         <Pressable style={s.icon} onPress={() => navigation.goBack()}>
           <ArrowLeft color={colors.text} />
@@ -624,6 +624,7 @@ function Editor({ route, navigation }) {
     >
       <Header
         back
+        compact
         navigation={navigation}
         center={
           <TextInput
@@ -665,6 +666,7 @@ function Editor({ route, navigation }) {
         </ScrollView>
       )}
       <ScrollView
+        style={s.editorScroll}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={s.editor}
       >
@@ -729,12 +731,14 @@ function Editor({ route, navigation }) {
             style={[s.noteContent, { fontSize: prefs.editorFontSize }]}
           />
         )}
-        <Text style={s.small}>
+      </ScrollView>
+      <SafeAreaView edges={["bottom"]} style={s.editorStatusBar}>
+        <Text numberOfLines={1} style={s.editorStatusText}>
           {content.trim() ? content.trim().split(/\s+/).length : 0} words ·{" "}
           {content.length} characters ·{" "}
           {note.is_system ? "Welcome note" : "Saved offline"}
         </Text>
-      </ScrollView>
+      </SafeAreaView>
       <Modal
         transparent
         visible={more}
@@ -1849,6 +1853,10 @@ const createStyles = () =>
       borderBottomWidth: 1,
       borderColor: colors.border,
     },
+    compactHeader: {
+      height: 78,
+      paddingBottom: 3,
+    },
     headerTitle: {
       color: colors.text,
       fontSize: 18,
@@ -1969,6 +1977,21 @@ const createStyles = () =>
       fontWeight: "800",
       paddingVertical: 8,
       textAlign: "center",
+    },
+    editorScroll: { flex: 1 },
+    editorStatusBar: {
+      minHeight: 36,
+      justifyContent: "center",
+      paddingHorizontal: 16,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    editorStatusText: {
+      color: colors.muted,
+      fontSize: 11,
+      lineHeight: 16,
+      textAlign: "right",
     },
     eyebrow: {
       color: colors.primary,
