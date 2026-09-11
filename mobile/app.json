@@ -28,6 +28,7 @@
       "edgeToEdgeEnabled": false,
       "package": "com.echo8v.echonotes",
       "permissions": [
+        "android.permission.CAMERA",
         "android.permission.CAMERA"
       ]
     },
@@ -72,6 +73,12 @@
       "eas": {
         "projectId": "170faac7-9c53-4292-bcaa-5b2f9d367c56"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/170faac7-9c53-4292-bcaa-5b2f9d367c56"
     }
   }
 }
