@@ -102,7 +102,11 @@ export function NearbyClipboardProvider({ children }) {
         setStatus({ state: "error", message: readableError(error) });
       });
     };
-    socket.onerror = () => setStatus({ state: "error", message: `Could not reach ${peer.name}` });
+    // Android can dispatch a late error event from the pairing handshake even
+    // though the bridge has already promoted that socket to a sync connection.
+    // `onclose` is the reliable signal here, so do not turn a successful pair
+    // into a false "Could not reach the PC" error.
+    socket.onerror = () => {};
     socket.onclose = () => {
       if (socketRef.current === socket) socketRef.current = null;
       setStatus({ state: "offline", message: `${peer.name} disconnected` });
@@ -257,7 +261,9 @@ export function NearbyClipboardProvider({ children }) {
       }
     };
     socket.onerror = () => {
-      if (pairingApproved) return;
+      const alreadyTrusted = activePeerRef.current?.id === peer.id
+        || peersRef.current.some((item) => item.id === peer.id && item.sharedKey);
+      if (pairingApproved || alreadyTrusted) return;
       const message = "Could not reach the PC. Keep both devices on the same Wi-Fi or hotspot and allow the bridge through Windows Firewall.";
       setPairing({ state: "error", peer, error: message }); setStatus({ state: "error", message });
     };

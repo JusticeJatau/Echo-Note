@@ -46,11 +46,14 @@ import {
   HelpCircle,
   Italic,
   List,
+  ListChecks,
+  ListOrdered,
   Lightbulb,
   LogIn,
   LogOut,
   Laptop,
   MessageSquare,
+  Minus,
   MoreHorizontal,
   Palette,
   Plus,
@@ -105,19 +108,17 @@ function useScreenTheme() {
 }
 const owner = () => useAuthStore.getState().session?.user?.id ?? "guest";
 
-function Header({ title, back, navigation, right }) {
+function Header({ title, back, navigation, right, center }) {
   return (
     <SafeAreaView edges={["top"]} style={s.header}>
-      {back && (
+      {back ? (
         <Pressable style={s.icon} onPress={() => navigation.goBack()}>
           <ArrowLeft color={colors.text} />
         </Pressable>
-      )}
-      <Text numberOfLines={1} style={s.headerTitle}>
-        {title}
-      </Text>
-      <View style={{ flex: 1 }} />
-      {right}
+      ) : center ? <View style={s.icon} /> : null}
+      {center ? <View style={s.headerCenter}>{center}</View> : <Text numberOfLines={1} style={s.headerTitle}>{title}</Text>}
+      {!center && <View style={{ flex: 1 }} />}
+      {right ?? (center ? <View style={s.icon} /> : null)}
     </SafeAreaView>
   );
 }
@@ -530,9 +531,14 @@ const FORMAT = [
   { label: "B", before: "**", after: "**", Icon: Bold },
   { label: "I", before: "*", after: "*", Icon: Italic },
   { label: "S", before: "~~", after: "~~", Icon: Strikethrough },
-  { label: "H1", before: "# ", after: "" },
-  { label: "Quote", before: "> ", after: "", Icon: Quote },
-  { label: "List", before: "- ", after: "", Icon: List },
+  { label: "H1", prefix: "# " },
+  { label: "H2", prefix: "## " },
+  { label: "H3", prefix: "### " },
+  { label: "Quote", prefix: "> ", Icon: Quote },
+  { label: "List", prefix: "- ", Icon: List },
+  { label: "Ordered", prefix: "1. ", Icon: ListOrdered },
+  { label: "Checklist", prefix: "- [ ] ", Icon: ListChecks },
+  { label: "Line", block: "---", Icon: Minus },
   { label: "Code", before: "```js\n", after: "\n```", Icon: Code },
 ];
 function Editor({ route, navigation }) {
@@ -575,6 +581,29 @@ function Editor({ route, navigation }) {
     save({ title: title.trim() || "Untitled Note", content: v });
   };
   const format = (t) => {
+    if (t.block) {
+      const before = content.slice(0, selection.start);
+      const after = content.slice(selection.end);
+      const insertion = `${before && !before.endsWith("\n") ? "\n" : ""}${t.block}\n`;
+      changeContent(before + insertion + after);
+      const cursor = before.length + insertion.length;
+      setSelection({ start: cursor, end: cursor });
+      return;
+    }
+    if (t.prefix) {
+      const lineStart = content.lastIndexOf("\n", Math.max(0, selection.start - 1)) + 1;
+      const selectedEnd = selection.end > selection.start ? selection.end : selection.start;
+      const lineEndIndex = content.indexOf("\n", selectedEnd);
+      const lineEnd = lineEndIndex === -1 ? content.length : lineEndIndex;
+      const lines = content.slice(lineStart, lineEnd).split("\n");
+      const replacement = lines.map((line, index) => {
+        if (t.label === "Ordered") return `${index + 1}. ${line.replace(/^\s*\d+\.\s+/, "")}`;
+        return t.prefix + line;
+      }).join("\n");
+      changeContent(content.slice(0, lineStart) + replacement + content.slice(lineEnd));
+      setSelection({ start: lineStart + t.prefix.length, end: lineStart + replacement.length });
+      return;
+    }
     const chosen = content.slice(selection.start, selection.end);
     const next =
       content.slice(0, selection.start) +
@@ -596,7 +625,20 @@ function Editor({ route, navigation }) {
       <Header
         back
         navigation={navigation}
-        title=""
+        center={
+          <TextInput
+            editable={!note.is_system}
+            multiline={false}
+            value={title}
+            onChangeText={(v) => {
+              setTitle(v);
+              save({ title: v.trim() || "Untitled Note", content });
+            }}
+            placeholder="Untitled Note"
+            placeholderTextColor={colors.muted}
+            style={s.editorHeaderTitle}
+          />
+        }
         right={
           <View style={s.editorActions}>
             <Pressable style={s.icon} onPress={() => setMore(true)}>
@@ -626,16 +668,6 @@ function Editor({ route, navigation }) {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={s.editor}
       >
-        <TextInput
-          editable={!note.is_system}
-          multiline
-          value={title}
-          onChangeText={(v) => {
-            setTitle(v);
-            save({ title: v.trim() || "Untitled Note", content });
-          }}
-          style={s.noteTitle}
-        />
         {!note.is_system && (
           <>
             <TextInput
@@ -1677,6 +1709,12 @@ function AppContent() {
     return () => auth?.unsubscribe();
   }, []);
   useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void useAuthStore.getState().resumeSession();
+    });
+    return () => subscription.remove();
+  }, []);
+  useEffect(() => {
     if (!ready || !preferencesReady) return;
     let cancelled = false;
     const timer = setTimeout(() => {
@@ -1923,6 +1961,14 @@ const createStyles = () =>
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "flex-end",
+    },
+    headerCenter: { flex: 1, paddingHorizontal: 8 },
+    editorHeaderTitle: {
+      color: colors.text,
+      fontSize: 17,
+      fontWeight: "800",
+      paddingVertical: 8,
+      textAlign: "center",
     },
     eyebrow: {
       color: colors.primary,
